@@ -1,0 +1,21 @@
+# Build artifacts
+build/
+plugins/*.dylib
+plugins/*.so
+
+# macOS
+.DS_Store
+._*
+
+# Editor
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+
+# Compiled Object files
+*.o
+
+# Note: We keep plugins/ directory but ignore built libraries
+# Hardware .o files may be committed for deployment tracking
