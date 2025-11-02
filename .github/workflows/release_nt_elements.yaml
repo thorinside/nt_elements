@@ -1,0 +1,54 @@
+name: Make NT Elements Plug-in Archive
+
+on:
+  push:
+    tags:
+      - "v*" # Runs action on pushed tags starting with 'v'
+
+permissions:
+  contents: write # Needed for creating/updating GitHub releases
+
+jobs:
+  build-and-release:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        # Ensure submodules are checked out (distingNT_API and Mutable Instruments code)
+        with:
+          submodules: "recursive" # This ensures all submodules are checked out
+
+      - name: Install dependencies via Homebrew
+        run: |
+          brew update
+          brew install --cask gcc-arm-embedded
+
+      - name: Verify installation
+        run: |
+          arm-none-eabi-g++ --version
+
+      - name: Build nt_elements plugin
+        run: |
+          echo "Building nt_elements"
+          make clean
+          make hardware
+
+      - name: Prepare directory structure for nt_elements zip
+        run: |
+          mkdir -p release/programs/plug-ins/nt_elements
+          echo "Copying nt_elements.o"
+          cp plugins/nt_elements.o release/programs/plug-ins/nt_elements/
+
+      - name: Zip nt_elements plugin artifact
+        run: |
+          cd release
+          zip -r ../nt_elements-plugin.zip programs
+          cd ..
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: nt_elements-plugin.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
