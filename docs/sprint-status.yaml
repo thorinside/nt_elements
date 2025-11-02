@@ -54,7 +54,7 @@ development_status:
   2-2-oled-display-implementation: done
   2-3-preset-save-load-integration: ready-for-dev
   2-4-factory-preset-library: ready-for-dev
-  2-5-performance-optimization: ready-for-dev
+  2-5-performance-optimization: done
   2-6-sound-quality-a-b-validation: ready-for-dev
   2-7-final-testing-and-release-preparation: ready-for-dev
   epic-2-retrospective: optional
