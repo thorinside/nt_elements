@@ -43,7 +43,7 @@ namespace page_exciter {
         kParamBlowTimbre     // Encoder 2: Blow Timbre (0-100%)
     };
 
-    const char* PAGE_NAME = "EXCITER";
+    static const char* PAGE_NAME = "EXCITER";
 }
 
 // Page 2 - Resonator: The core of Elements synthesis
@@ -62,7 +62,7 @@ namespace page_resonator {
         kParamInharmonicity      // Encoder 2: Inharmonicity (metallic/bell-like character)
     };
 
-    const char* PAGE_NAME = "RESONATOR";
+    static const char* PAGE_NAME = "RESONATOR";
 }
 
 // Page 3 - Space: Reverb section adds spatial dimension
@@ -81,7 +81,7 @@ namespace page_space {
         -1   // Encoder 2: Reserved (could be reverb type selector)
     };
 
-    const char* PAGE_NAME = "SPACE";
+    static const char* PAGE_NAME = "SPACE";
 }
 
 // Page 4 - Performance: Global parameters affecting overall synthesis
@@ -100,7 +100,7 @@ namespace page_performance {
         kParamExciterContour // Encoder 2: Exciter Contour (envelope shape)
     };
 
-    const char* PAGE_NAME = "PERF";
+    static const char* PAGE_NAME = "PERF";
 }
 
 // Unified page access structure for generic page navigation
@@ -110,8 +110,8 @@ struct PageMapping {
     const char* name;
 };
 
-// Page mapping table indexed by PageIndex
-const PageMapping PAGE_MAPPINGS[kNumPages] = {
+// Page mapping table indexed by PageIndex (static to avoid duplicate symbols)
+static const PageMapping PAGE_MAPPINGS[kNumPages] = {
     { page_exciter::POT_MAPPING, page_exciter::ENCODER_MAPPING, page_exciter::PAGE_NAME },
     { page_resonator::POT_MAPPING, page_resonator::ENCODER_MAPPING, page_resonator::PAGE_NAME },
     { page_space::POT_MAPPING, page_space::ENCODER_MAPPING, page_space::PAGE_NAME },

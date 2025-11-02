@@ -14,6 +14,7 @@ STMLIB_ROOT = external/mutable-instruments/stmlib
 # Source files
 SOURCES = \
 	src/nt_elements.cpp \
+	src/oled_display.cpp \
 	src/resources_minimal_wavetables.cc \
 	external/mutable-instruments/elements/dsp/exciter.cc \
 	external/mutable-instruments/elements/dsp/multistage_envelope.cc \
