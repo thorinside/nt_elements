@@ -15,9 +15,9 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        # Ensure submodules are checked out (distingNT_API and Mutable Instruments code)
+        # Ensure submodules are checked out (distingNT_API only, Mutable Instruments code is tracked directly)
         with:
-          submodules: "recursive" # This ensures all submodules are checked out
+          submodules: true  # Checkout only first-level submodules (not recursive to avoid airwindows)
           fetch-depth: 0  # Fetch all history and tags for release notes
 
       - name: Install dependencies via Homebrew
