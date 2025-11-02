@@ -46,6 +46,9 @@ struct nt_elementsAlgorithm : public _NT_algorithm {
 
     // Output scaling
     float output_level_scale;
+
+    // CV input state
+    bool gate_cv_was_high;  // For gate edge detection
 };
 
 #endif // NT_ELEMENTS_H_

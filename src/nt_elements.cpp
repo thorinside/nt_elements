@@ -79,6 +79,11 @@ static const _NT_parameter parameters[kNumParams] = {
     { .name = "Output Lvl", .min = 0, .max = 100, .def = 100, .unit = kNT_unitPercent, .scaling = 0, .enumStrings = NULL },
     { .name = "FM Amount", .min = 0, .max = 100, .def = 0, .unit = kNT_unitPercent, .scaling = 0, .enumStrings = NULL },
     { .name = "Exciter Cnt", .min = 0, .max = 100, .def = 50, .unit = kNT_unitPercent, .scaling = 0, .enumStrings = NULL },
+
+    // Page 5 - Routing (3 parameters: MIDI Chan 0=Off, 1-16=specific channel)
+    { .name = "MIDI Chan", .min = 0, .max = 16, .def = 1, .unit = kNT_unitNone, .scaling = 0, .enumStrings = NULL },
+    NT_PARAMETER_CV_INPUT("V/Oct CV", 0, 0)
+    NT_PARAMETER_CV_INPUT("Gate CV", 0, 0)
 };
 
 // Parameter pages for menu organization
@@ -99,7 +104,8 @@ static const uint8_t pagePerformance[] = {
 };
 
 static const uint8_t pageRouting[] = {
-    kParamInputBus, kParamOutputBus, kParamOutputMode
+    kParamInputBus, kParamOutputBus, kParamOutputMode,
+    kParamMidiChannel, kParamVOctCV, kParamGateCV
 };
 
 static const _NT_parameterPage pages[] = {
@@ -223,6 +229,9 @@ static _NT_algorithm* construct(const _NT_algorithmMemoryPtrs& ptrs, const _NT_a
 
     // Initialize output level (default = 100% = full volume)
     self->output_level_scale = 1.0f;
+
+    // Initialize CV input state
+    self->gate_cv_was_high = false;
 
     // Initialize default patch parameters (balanced modal sound)
     elements::Patch* patch = self->elements_part->mutable_patch();
@@ -394,11 +403,9 @@ static void step(_NT_algorithm* self, float* busFrames, int numFramesBy4) {
         algo->pending_update = false;
     }
 
-    // Apply tuning offset to MIDI note
-    // Elements::Part stores note as MIDI note number, modulation is added during processing
-    // We add our tuning offset to the modulation field
-    float original_modulation = algo->perf_state.modulation;
-    algo->perf_state.modulation = original_modulation + algo->tuning_offset_semitones;
+    // Process CV inputs (CV takes priority over MIDI when Gate CV is high)
+    const int voct_bus = static_cast<int>(self->v[kParamVOctCV]) - 1;
+    const int gate_bus = static_cast<int>(self->v[kParamGateCV]) - 1;
 
     // busFrames layout: [bus0_frames][bus1_frames]...[bus27_frames]
     const int numFrames = numFramesBy4 * 4;
@@ -407,6 +414,48 @@ static void step(_NT_algorithm* self, float* busFrames, int numFramesBy4) {
     if (numFrames > 512 || numFrames <= 0) {
         return;  // Protect SRAM; invalid buffer sizes
     }
+
+    const float* voct_cv = nullptr;
+    const float* gate_cv = nullptr;
+
+    if (voct_bus >= 0 && voct_bus < 28) {
+        voct_cv = busFrames + (voct_bus * numFrames);
+    }
+    if (gate_bus >= 0 && gate_bus < 28) {
+        gate_cv = busFrames + (gate_bus * numFrames);
+    }
+
+    // Process CV inputs (use first sample of block for control-rate processing)
+    if (gate_cv != nullptr) {
+        float gate_voltage = gate_cv[0];
+        bool gate_high = gate_voltage > 1.0f;  // Eurorack gate threshold
+
+        if (gate_high) {
+            // Gate is HIGH - CV takes priority over MIDI
+            // Read V/OCT CV (default to 0V = C4 if not connected)
+            float voct_voltage = voct_cv ? voct_cv[0] : 0.0f;
+
+            // Convert V/OCT to MIDI note: 1V/octave, 0V = C4 (MIDI 60)
+            float cv_note = (voct_voltage * 12.0f) + 60.0f;
+
+            // Clamp to valid MIDI range (0-127)
+            cv_note = fmaxf(0.0f, fminf(127.0f, cv_note));
+
+            // Override performance state with CV values
+            algo->perf_state.note = cv_note;
+            algo->perf_state.gate = true;
+            algo->perf_state.strength = 0.8f;  // Fixed velocity for CV input
+        }
+        // If gate is LOW, fall through to use MIDI state (already applied above)
+
+        algo->gate_cv_was_high = gate_high;
+    }
+
+    // Apply tuning offset to MIDI note
+    // Elements::Part stores note as MIDI note number, modulation is added during processing
+    // We add our tuning offset to the modulation field
+    float original_modulation = algo->perf_state.modulation;
+    algo->perf_state.modulation = original_modulation + algo->tuning_offset_semitones;
 
 #ifdef NT_EMU_DEBUG
     static int debug_counter = 0;
@@ -660,11 +709,22 @@ static void midiMessage(_NT_algorithm* self, uint8_t b0, uint8_t b1, uint8_t b2)
 
     // Parse MIDI message
     const uint8_t status = b0 & 0xF0;
-    const uint8_t channel = b0 & 0x0F;
+    const uint8_t channel = b0 & 0x0F;  // 0-15
     const uint8_t data1 = b1 & 0x7F;
     const uint8_t data2 = b2 & 0x7F;
 
-    (void)channel;  // Suppress unused warning
+    // MIDI channel filtering (0=Off/disabled, 1-16=specific channel)
+    int16_t midi_channel_param = self->v[kParamMidiChannel];
+    if (midi_channel_param == 0) {
+        return;  // MIDI disabled
+    }
+    if (midi_channel_param >= 1 && midi_channel_param <= 16) {
+        // Check if message is on the correct channel (param is 1-based, channel is 0-based)
+        if (channel != (midi_channel_param - 1)) {
+            return;  // Wrong channel, ignore message
+        }
+    }
+    // If param > 16, treat as "all channels" (omni mode)
 
     // Copy current state to pending (preserves fields we don't modify)
     if (!algo->pending_update) {
