@@ -199,8 +199,8 @@ static _NT_algorithm* construct(const _NT_algorithmMemoryPtrs& ptrs, const _NT_a
     // Initialize Elements Part with reverb buffer
     self->elements_part->Init(self->reverb_buffer);
 
-    // Initialize default performance state
-    self->perf_state.gate = false;
+    // Initialize default performance state (gate ON by default to trigger bow exciter)
+    self->perf_state.gate = true;   // Enable gate so bow exciter produces sound on startup
     self->perf_state.note = 69.0f;  // MIDI note number A4 (69)
     self->perf_state.modulation = 0.0f;  // Pitch bend offset in semitones
     self->perf_state.strength = 0.8f;
@@ -210,7 +210,7 @@ static _NT_algorithm* construct(const _NT_algorithmMemoryPtrs& ptrs, const _NT_a
     self->pending_update = false;
 
     // Initialize pending state to match current state
-    self->pending_state.gate = false;
+    self->pending_state.gate = true;   // Match perf_state
     self->pending_state.note = 69.0f;
     self->pending_state.modulation = 0.0f;
     self->pending_state.strength = 0.8f;
