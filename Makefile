@@ -88,8 +88,6 @@ apply-patches:
 		patch -p5 < ../../../../$(PATCH_DIR)/elements-dynamic-sample-rate.patch && \
 		touch .nt_elements_patched && \
 		echo "Patches applied successfully"; \
-	else \
-		echo "Patches already applied (marker file exists)"; \
 	fi
 
 # Hardware target - ARM .o for disting NT
