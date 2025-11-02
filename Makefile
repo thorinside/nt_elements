@@ -68,13 +68,29 @@ CXXFLAGS_TEST = $(CXXFLAGS_COMMON) $(DEFINES_TEST) -O2 -fPIC
 PLUGINS_DIR = plugins
 BUILD_DIR = build
 
-# Targets
-.PHONY: all hardware test clean
+# Patch management
+PATCH_DIR = patches
+PATCH_MARKER = external/mutable-instruments/elements/dsp/.nt_elements_patched
 
-all: hardware test
+# Targets
+.PHONY: all hardware test clean apply-patches
+
+all: apply-patches hardware test
+
+# Apply patches to Elements DSP if not already applied
+apply-patches:
+	@if [ ! -f $(PATCH_MARKER) ]; then \
+		echo "Applying Elements DSP patches..."; \
+		cd external/mutable-instruments/elements/dsp && \
+		patch -p5 < ../../../../$(PATCH_DIR)/elements-dynamic-sample-rate.patch && \
+		touch .nt_elements_patched && \
+		echo "Patches applied successfully"; \
+	else \
+		echo "Patches already applied (marker file exists)"; \
+	fi
 
 # Hardware target - ARM .o for disting NT
-hardware: $(PLUGINS_DIR)/$(PROJECT).o
+hardware: apply-patches $(PLUGINS_DIR)/$(PROJECT).o
 
 # Generate object file list for hardware build
 OBJS = $(patsubst %.cpp,$(BUILD_DIR)/%.o,$(notdir $(filter %.cpp,$(SOURCES)))) \
@@ -111,11 +127,11 @@ $(PLUGINS_DIR)/$(PROJECT).o: $(OBJS) | $(PLUGINS_DIR)
 	@echo "NOTE: Built with minimal wavetables (all LUTs + noise + 2 smallest wavetables): ~180KB vs 407KB full"
 
 # Test target - native .dylib/.so for VCV Rack nt_emu
-test: $(PLUGINS_DIR)/$(PROJECT).$(DYLIB_EXT)
+test: apply-patches $(PLUGINS_DIR)/$(PROJECT).$(DYLIB_EXT)
 
 $(PLUGINS_DIR)/$(PROJECT).$(DYLIB_EXT): $(SOURCES) | $(PLUGINS_DIR) $(BUILD_DIR)
 ifeq ($(UNAME_S),Darwin)
-	$(CXX_TEST) $(CXXFLAGS_TEST) $(INCLUDES) -dynamiclib $(SOURCES) -o $@
+	$(CXX_TEST) $(CXXFLAGS_TEST) $(INCLUDES) -dynamiclib -undefined dynamic_lookup $(SOURCES) -o $@
 else
 	$(CXX_TEST) $(CXXFLAGS_TEST) $(INCLUDES) -shared $(SOURCES) -o $@
 endif
@@ -133,3 +149,8 @@ $(BUILD_DIR):
 clean:
 	rm -rf $(PLUGINS_DIR) $(BUILD_DIR)
 	@echo "Build artifacts cleaned"
+
+# Clean build artifacts AND remove patch marker (forces reapplication)
+clean-all: clean
+	rm -f $(PATCH_MARKER)
+	@echo "Build artifacts and patch marker cleaned"
