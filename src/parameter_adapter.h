@@ -47,6 +47,11 @@ enum ParameterIndices {
     kParamFMAmount,          // FM modulation amount (0-100% → 0.0-1.0)
     kParamExciterContour,    // Exciter envelope shape (0-100% → 0.0-1.0)
 
+    // Page 5 - Routing (3 parameters added to existing routing params)
+    kParamMidiChannel,       // MIDI channel filter (0=Off/disabled, 1-16=specific channel)
+    kParamVOctCV,            // V/OCT CV input bus (0=none, 1-28=bus number)
+    kParamGateCV,            // Gate CV input bus (0=none, 1-28=bus number)
+
     kNumParams
 };
 

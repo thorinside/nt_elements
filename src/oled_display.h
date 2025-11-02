@@ -29,8 +29,8 @@ const int SCREEN_HEIGHT = 64;
 
 // Layout positions
 const int PAGE_TITLE_Y = 0;         // Page title at top
-const int PARAM_START_Y = 24;       // Parameters start below title
-const int PARAM_LINE_HEIGHT = 9;    // Space between parameter lines
+const int PARAM_START_Y = 14;       // Parameters start below title
+const int PARAM_LINE_HEIGHT = 10;   // Space between parameter lines
 const int PARAM_NAME_X = 2;         // Left margin for parameter names
 const int PARAM_VALUE_X = 180;      // Right-aligned values
 
