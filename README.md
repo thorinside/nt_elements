@@ -8,15 +8,27 @@ nt_elements brings the iconic Elements modal synthesis engine to the Expert Slee
 
 ## Features
 
+### Core Synthesis
 - Complete Elements DSP engine (bow/blow/strike exciters)
 - 64-filter modal resonator with geometry, brightness, damping controls
-- Stereo reverb with amount, size, damping parameters
-- 4 parameter pages organized: Exciter, Resonator, Space, Performance
-- MIDI note input with pitch bend support
-- 8 factory presets demonstrating diverse timbres
-- Preset save/load integration
-- 48kHz sample rate operation
-- CPU usage < 30% (typical operation)
+- Stereo reverb with separate Main and Aux outputs for flexible routing
+- 4 parameter pages: Exciter, Resonator, Space, Performance
+- 5th Routing page for I/O and CV configuration
+
+### Connectivity
+- **Stereo Output**: Main Output (bus 13) + Aux Output (bus 14) for reverb spreading
+- **MIDI Input**: Note on/off, pitch bend, channel filtering (1-16 or omni)
+- **Essential CV Inputs**:
+  - V/Oct CV: 1V/octave pitch tracking
+  - Gate CV: Trigger/gate input
+  - FM CV: Dynamic FM modulation (±5V)
+  - Brightness CV: Filter cutoff modulation (±5V)
+  - Expression CV: Dynamics/velocity control (0-10V)
+
+### Performance
+- Native 32kHz sample rate (optimized for distingNT)
+- CPU usage < 30% (allows chaining with other algorithms)
+- ~207KB hardware build size
 
 ## Installation
 
@@ -59,19 +71,16 @@ nt_elements organizes parameters into 4 pages accessible via the button:
 
 ### MIDI Control
 
-Send MIDI notes to the configured MIDI channel to trigger synthesis. Pitch bend is supported for expressive performance.
+Send MIDI notes to the configured MIDI channel to trigger synthesis. Configure MIDI channel on the Routing page (0=omni, 1-16=specific channel). Pitch bend is supported for expressive performance.
 
-### Factory Presets
+### CV Modulation
 
-8 factory presets are included demonstrating various timbres:
-- Bell Strike
-- Bowed String
-- Blown Pipe
-- Drum Hit
-- Harmonic Pad
-- Metallic Pluck
-- Resonant Sweep
-- Ethereal Voices
+**Dedicated CV Inputs** (for frequently-used modulations):
+- **FM CV**: Vibrato, pitch warble effects
+- **Brightness CV**: Filter sweeps with envelopes/LFOs
+- **Expression CV**: Dynamics from velocity or pressure sources
+
+**Manual Mapping**: Any parameter can be mapped to any CV bus via the distingNT interface for advanced control.
 
 ## Credits
 
@@ -94,6 +103,13 @@ For issues, questions, or feedback:
 - Open an issue on GitHub
 - Join the discussion on the disting NT Discord
 
-## Version
+## Version History
 
-v1.0.0 - Initial Release
+### v1.0.0 (2025-11-02)
+- Initial release
+- Full Elements DSP integration at 32kHz
+- 4 parameter pages + routing page
+- **Stereo output**: Main + Aux for reverb spreading
+- **Essential CV inputs**: FM, Brightness, Expression
+- MIDI and CV/Gate support
+- Custom OLED display with page navigation
