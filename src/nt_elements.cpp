@@ -502,11 +502,10 @@ static bool draw(_NT_algorithm* self) {
     return false;
 }
 
-// Custom UI handler - used for page navigation via button presses
+// Custom UI handler - used for page navigation and per-page parameter routing
 static uint32_t hasCustomUi(_NT_algorithm* /*self*/) {
-    // We only handle buttons 1 and 2 for page navigation (prev/next)
-    // Pots and encoders use the standard parameter system
-    return kNT_button1 | kNT_button2;
+    // Handle encoder buttons for page navigation and pots/encoders for per-page parameter control
+    return kNT_encoderButtonL | kNT_encoderButtonR | kNT_potL | kNT_potC | kNT_potR | kNT_encoderL | kNT_encoderR;
 }
 
 static void customUi(_NT_algorithm* self, const _NT_uiData& data) {
@@ -522,126 +521,77 @@ static void customUi(_NT_algorithm* self, const _NT_uiData& data) {
         return;  // Plugin being destroyed during reload
     }
 
+    // Validate current page index (protect against corruption during reload)
+    if (algo->current_page < 0 || algo->current_page >= kNumPages) {
+        return;  // Invalid page state
+    }
+
     // Get current and last button states
     uint16_t current_buttons = data.controls & 0xFFFF;
 
-    // Detect button press events (rising edge detection)
-    bool button1_pressed = (current_buttons & kNT_button1) && !(algo->last_button_state & kNT_button1);
-    bool button2_pressed = (current_buttons & kNT_button2) && !(algo->last_button_state & kNT_button2);
-    bool button3_pressed = (current_buttons & kNT_button3) && !(algo->last_button_state & kNT_button3);
-    bool button4_pressed = (current_buttons & kNT_button4) && !(algo->last_button_state & kNT_button4);
+    // Detect encoder button press events (rising edge detection)
+    bool encoderL_pressed = (current_buttons & kNT_encoderButtonL) && !(algo->last_button_state & kNT_encoderButtonL);
+    bool encoderR_pressed = (current_buttons & kNT_encoderButtonR) && !(algo->last_button_state & kNT_encoderButtonR);
 
     // Save current state for next call
     algo->last_button_state = current_buttons;
 
-    // Button 1: Previous page (encoder 1 button)
-    if (button1_pressed) {
+    // Encoder 1 button: Previous page (wraps around)
+    if (encoderL_pressed) {
         algo->current_page = (algo->current_page - 1 + kNumPages) % kNumPages;
 #ifdef NT_EMU_DEBUG
-        printf("Page navigation: Button 1 -> Page %d (%s)\n",
+        printf("Page navigation: Encoder L button -> Page %d (%s)\n",
                algo->current_page, PAGE_MAPPINGS[algo->current_page].name);
 #endif
     }
 
-    // Button 2: Next page (encoder 2 button)
-    if (button2_pressed) {
+    // Encoder 2 button: Next page (wraps around)
+    if (encoderR_pressed) {
         algo->current_page = (algo->current_page + 1) % kNumPages;
 #ifdef NT_EMU_DEBUG
-        printf("Page navigation: Button 2 -> Page %d (%s)\n",
+        printf("Page navigation: Encoder R button -> Page %d (%s)\n",
                algo->current_page, PAGE_MAPPINGS[algo->current_page].name);
 #endif
     }
-
-    // Buttons 3 and 4: Reserved for future use
-    (void)button3_pressed;
-    (void)button4_pressed;
 
     // Get current page mapping
     const PageMapping& page = PAGE_MAPPINGS[algo->current_page];
 
-    // Note: Pot/encoder handling is done through the standard parameter system (parameterChanged callback)
-    // We only handle button presses here for page navigation
-    // This avoids conflicts with the menu system
+    // Get algorithm index and parameter offset for NT_setParameterFromUi calls
+    uint32_t algIdx = NT_algorithmIndex(self);
+    uint32_t paramOffset = NT_parameterOffset();
 
-    // Pot/encoder code commented out - using standard parameter system instead
-    /*
-    elements::Patch* patch = algo->elements_part->mutable_patch();
+    // Handle pot changes - pots provide absolute values (0.0-1.0)
+    // Convert to parameter range and call NT_setParameterFromUi to update
 
     // Check which pots changed using the controls bitmask
     for (int i = 0; i < 3; ++i) {
         uint16_t pot_mask = (i == 0) ? kNT_potL : (i == 1) ? kNT_potC : kNT_potR;
         if (data.controls & pot_mask) {
-            // Pot changed - route to Elements Patch field based on current page
+            // Pot changed - route to parameter based on current page
             int param_index = page.pot_mapping[i];
-            float pot_value = data.pots[i];  // 0.0-1.0 from hardware
+            const _NT_parameter& param_spec = parameters[param_index];
 
-            // Update Elements Patch directly based on parameter mapping
-            // Note: Pot values come through parameterChanged() callback, not here
-            switch (param_index) {
-                // Page 1 - Exciter
-                case kParamBowLevel:
-                    patch->exciter_bow_level = pot_value;
-                    break;
-                case kParamBlowLevel:
-                    patch->exciter_blow_level = pot_value;
-                    break;
-                case kParamStrikeLevel:
-                    patch->exciter_strike_level = pot_value;
-                    break;
+            // Convert pot value (0.0-1.0) to parameter range (min-max)
+            float pot_value = data.pots[i];
+            int param_value = roundf(param_spec.min + pot_value * (param_spec.max - param_spec.min));
+            param_value = fmaxf(param_spec.min, fminf(param_value, param_spec.max));
 
-                // Page 2 - Resonator
-                case kParamGeometry:
-                    patch->resonator_geometry = pot_value;
-                    break;
-                case kParamBrightness:
-                    patch->resonator_brightness = pot_value;
-                    break;
-                case kParamDamping:
-                    patch->resonator_damping = pot_value;
-                    break;
-
-                // Page 3 - Space
-                case kParamReverbAmount:
-                    patch->space = pot_value;
-                    break;
-                case kParamReverbSize:
-                    patch->reverb_lp = pot_value;
-                    break;
-                case kParamReverbDamping:
-                    patch->reverb_diffusion = pot_value;
-                    break;
-
-                // Page 4 - Performance
-                case kParamCoarseTune:
-                    // Convert 0.0-1.0 to -12 to +12 semitones
-                    algo->tuning_offset_semitones = (pot_value - 0.5f) * 24.0f;
-                    break;
-                case kParamFineTune:
-                    // Convert 0.0-1.0 to -50 to +50 cents
-                    algo->tuning_offset_semitones = (pot_value - 0.5f) * 1.0f;
-                    break;
-                case kParamOutputLevel:
-                    algo->output_level_scale = pot_value;
-                    break;
-
-                default:
-                    break;
-            }
+            // Update parameter via framework (triggers parameterChanged callback)
+            NT_setParameterFromUi(algIdx, param_index + paramOffset, param_value);
 
 #ifdef NT_EMU_DEBUG
-            printf("Pot %d changed on page %s: param=%d value=%.2f\n",
-                   i, page.name, param_index, pot_value);
+            printf("Pot %d changed on page %s: param=%d value=%d\n",
+                   i, page.name, param_index, param_value);
 #endif
         }
     }
 
     // Handle encoder changes - encoders provide delta values (±1 or 0)
-    // For encoders, we need to track the current value and apply deltas
-    // We'll store encoder values in the algorithm structure
     for (int i = 0; i < 2; ++i) {
         int8_t delta = data.encoders[i];
         if (delta != 0) {
-            // Encoder changed - route to Elements Patch field based on current page
+            // Encoder changed - route to parameter based on current page
             int param_index = page.encoder_mapping[i];
 
             // Check if encoder is mapped to a parameter (not reserved)
@@ -649,64 +599,24 @@ static void customUi(_NT_algorithm* self, const _NT_uiData& data) {
                 continue;  // Encoder not assigned on this page
             }
 
-            // Get current value from v[] (which is managed by framework for menu parameters)
-            // For performance controls, we need to maintain state
-            float step_size = 0.01f;  // 1% per detent
-            float current_value = 0.5f;  // Default center
+            const _NT_parameter& param_spec = parameters[param_index];
 
-            // Try to get current value from v[] if available
-            const _NT_parameter& param = parameters[param_index];
-            current_value = (self->v[param_index] - param.min) / (param.max - param.min);
+            // Get current value and apply delta
+            int current_value = self->v[param_index];
+            int new_value = current_value + delta;
 
-            // Apply delta
-            float new_value = current_value + (delta * step_size);
+            // Clamp to parameter range
+            new_value = fmaxf(param_spec.min, fminf(new_value, param_spec.max));
 
-            // Clamp to 0.0-1.0 range
-            if (new_value < 0.0f) new_value = 0.0f;
-            if (new_value > 1.0f) new_value = 1.0f;
-
-            // Update Elements Patch directly based on parameter mapping
-            // Note: Encoder values come through parameterChanged() callback, not here
-            switch (param_index) {
-                // Page 1 - Exciter
-                case kParamBowTimbre:
-                    patch->exciter_bow_timbre = new_value;
-                    break;
-                case kParamBlowTimbre:
-                    patch->exciter_blow_timbre = new_value;
-                    break;
-
-                // Page 2 - Resonator
-                case kParamResonatorPosition:
-                    patch->resonator_position = new_value;
-                    break;
-                case kParamInharmonicity:
-                    patch->resonator_modulation_frequency = new_value;
-                    break;
-
-                // Page 4 - Performance
-                case kParamFMAmount:
-                    patch->modulation_frequency = new_value;
-                    break;
-                case kParamExciterContour:
-                    patch->exciter_envelope_shape = new_value;
-                    break;
-
-                default:
-                    break;
-            }
+            // Update parameter via framework (triggers parameterChanged callback)
+            NT_setParameterFromUi(algIdx, param_index + paramOffset, new_value);
 
 #ifdef NT_EMU_DEBUG
-            printf("Encoder %d changed on page %s: param=%d delta=%d new_value=%.2f\n",
+            printf("Encoder %d changed on page %s: param=%d delta=%d new_value=%d\n",
                    i, page.name, param_index, delta, new_value);
 #endif
         }
     }
-    */
-
-    // Suppress unused variable warnings
-    (void)data;
-    (void)page;
 }
 
 static void setupUi(_NT_algorithm* self, _NT_float3& pots) {
@@ -720,6 +630,11 @@ static void setupUi(_NT_algorithm* self, _NT_float3& pots) {
     // Validate algorithm structure integrity
     if (!algo->elements_part) {
         return;  // Plugin being destroyed during reload
+    }
+
+    // Validate current page index (protect against corruption during reload)
+    if (algo->current_page < 0 || algo->current_page >= kNumPages) {
+        return;  // Invalid page state
     }
 
     // Get current page mapping
