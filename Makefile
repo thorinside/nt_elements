@@ -11,6 +11,9 @@ DISTINGNT_API = distingNT_API
 ELEMENTS_ROOT = external/mutable-instruments/elements
 STMLIB_ROOT = external/mutable-instruments/stmlib
 
+# Version from git (tag or commit hash)
+VERSION := $(shell git describe --tags --always --dirty 2>/dev/null || echo "v1.0.0-dev")
+
 # Source files
 SOURCES = \
 	src/nt_elements.cpp \
@@ -36,7 +39,7 @@ INCLUDES = \
 	-I$(DISTINGNT_API)/include \
 	-Iexternal/mutable-instruments
 
-DEFINES_COMMON = -DTEST -D_USE_MATH_DEFINES -include src/math_constants.h
+DEFINES_COMMON = -DTEST -D_USE_MATH_DEFINES -include src/math_constants.h -DNT_ELEMENTS_VERSION=\"$(VERSION)\"
 DEFINES_HARDWARE = $(DEFINES_COMMON)
 DEFINES_TEST = $(DEFINES_COMMON) -DNT_EMU_DEBUG
 

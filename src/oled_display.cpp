@@ -56,21 +56,21 @@ const char* PARAM_NAMES[kNumParams] = {
     "Expr"
 };
 
-void clearDisplay() {
-    // Clear screen memory (256x64 pixels, each byte = 2 pixels)
-    memset(NT_screen, 0, 128 * 64);
-}
-
 void renderPageTitle(int current_page) {
     // Get page name from page mappings
     if (current_page < 0 || current_page >= kNumPages) {
         return;  // Invalid page index
     }
 
-    const char* page_name = PAGE_MAPPINGS[current_page].name;
+    const PageMapping& page = PAGE_MAPPINGS[current_page];
+
+    // Safety check for null pointer
+    if (!page.name) {
+        return;
+    }
 
     // Draw page title centered at top with large font
-    NT_drawText(SCREEN_WIDTH / 2, PAGE_TITLE_Y, page_name, TEXT_COLOR, kNT_textCentre, TITLE_FONT);
+    NT_drawText(SCREEN_WIDTH / 2, PAGE_TITLE_Y, page.name, TEXT_COLOR, kNT_textCentre, TITLE_FONT);
 }
 
 const char* getParamName(int param_index) {
@@ -152,20 +152,42 @@ void renderParameters(nt_elementsAlgorithm* algo) {
 
     const PageMapping& page = PAGE_MAPPINGS[current_page];
 
+    // Safety check for null pointers in page mapping
+    if (!page.pot_mapping || !page.encoder_mapping) {
+        return;
+    }
+
     // Render pot parameters (3 pots)
     int y_pos = PARAM_START_Y;
     for (int i = 0; i < 3; ++i) {
+        // Bounds check for Y position
+        if (y_pos >= SCREEN_HEIGHT) {
+            break;
+        }
+
         int param_index = page.pot_mapping[i];
 
-        // Get parameter name
+        // Bounds check for parameter index
+        if (param_index < 0 || param_index >= kNumParams) {
+            y_pos += PARAM_LINE_HEIGHT;
+            continue;
+        }
+
+        // Get parameter name with null check
         const char* param_name = getParamName(param_index);
+        if (!param_name) {
+            y_pos += PARAM_LINE_HEIGHT;
+            continue;
+        }
 
         // Get parameter value from NT parameter array
         float param_value = algo->v[param_index];
 
-        // Format value based on parameter type
+        // Format value based on parameter type with guaranteed null termination
         char value_str[12];
+        value_str[0] = '\0';  // Ensure null termination
         formatParamValue(param_index, param_value, value_str);
+        value_str[11] = '\0';  // Ensure null termination at end
 
         // Draw parameter name (left-aligned)
         NT_drawText(PARAM_NAME_X, y_pos, param_name, TEXT_COLOR, kNT_textLeft, PARAM_FONT);
@@ -178,6 +200,11 @@ void renderParameters(nt_elementsAlgorithm* algo) {
 
     // Render encoder parameters (2 encoders)
     for (int i = 0; i < 2; ++i) {
+        // Bounds check for Y position
+        if (y_pos >= SCREEN_HEIGHT) {
+            break;
+        }
+
         int param_index = page.encoder_mapping[i];
 
         // Skip if encoder not mapped on this page
@@ -185,15 +212,27 @@ void renderParameters(nt_elementsAlgorithm* algo) {
             continue;
         }
 
-        // Get parameter name
+        // Bounds check for parameter index
+        if (param_index >= kNumParams) {
+            y_pos += PARAM_LINE_HEIGHT;
+            continue;
+        }
+
+        // Get parameter name with null check
         const char* param_name = getParamName(param_index);
+        if (!param_name) {
+            y_pos += PARAM_LINE_HEIGHT;
+            continue;
+        }
 
         // Get parameter value from NT parameter array
         float param_value = algo->v[param_index];
 
-        // Format value based on parameter type
+        // Format value based on parameter type with guaranteed null termination
         char value_str[12];
+        value_str[0] = '\0';  // Ensure null termination
         formatParamValue(param_index, param_value, value_str);
+        value_str[11] = '\0';  // Ensure null termination at end
 
         // Draw parameter name (left-aligned)
         NT_drawText(PARAM_NAME_X, y_pos, param_name, TEXT_COLOR, kNT_textLeft, PARAM_FONT);
@@ -210,8 +249,10 @@ void renderDisplay(nt_elementsAlgorithm* algo) {
         return;
     }
 
-    // Clear display
-    clearDisplay();
+    // Render version string at top-left
+#ifdef NT_ELEMENTS_VERSION
+    NT_drawText(PARAM_NAME_X, VERSION_Y, "nt_elements " NT_ELEMENTS_VERSION, TEXT_COLOR, kNT_textLeft, VERSION_FONT);
+#endif
 
     // Render page title
     renderPageTitle(algo->current_page);

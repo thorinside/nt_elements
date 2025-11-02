@@ -23,18 +23,20 @@
 
 namespace oled_display {
 
-// Display layout constants (128x64 pixel screen)
+// Display layout constants (256x64 pixel screen, stored as 128x64 bytes)
 const int SCREEN_WIDTH = 256;   // 256x64 pixels (each byte = 2 pixels)
 const int SCREEN_HEIGHT = 64;
 
-// Layout positions
-const int PAGE_TITLE_Y = 0;         // Page title at top
-const int PARAM_START_Y = 14;       // Parameters start below title
-const int PARAM_LINE_HEIGHT = 10;   // Space between parameter lines
-const int PARAM_NAME_X = 2;         // Left margin for parameter names
-const int PARAM_VALUE_X = 180;      // Right-aligned values
+// Layout positions (all must be < SCREEN_WIDTH/HEIGHT)
+const int VERSION_Y = 10;            // Version string near top
+const int PAGE_TITLE_Y = 30;         // Page title at top (moved down for large font)
+const int PARAM_START_Y = 22;        // Parameters start below title
+const int PARAM_LINE_HEIGHT = 9;     // Space between parameter lines
+const int PARAM_NAME_X = 4;          // Left margin for parameter names
+const int PARAM_VALUE_X = 240;       // Right-aligned values (safe margin from 256)
 
 // Font sizes
+const _NT_textSize VERSION_FONT = kNT_textTiny;  // Tiny font for version string
 const _NT_textSize TITLE_FONT = kNT_textLarge;   // 21pt for page title
 const _NT_textSize PARAM_FONT = kNT_textNormal;  // 8pt for parameters
 
@@ -101,11 +103,6 @@ const char* getParamName(int param_index);
  * @return Length of formatted string
  */
 int formatParamValue(int param_index, float value, char* buffer);
-
-/**
- * Clear the display (set all pixels to black)
- */
-void clearDisplay();
 
 /**
  * Render the complete display for the current page

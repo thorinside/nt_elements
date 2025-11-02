@@ -619,8 +619,8 @@ static bool draw(_NT_algorithm* self) {
     // Always render the display (distingNT calls draw() continuously)
     oled_display::renderDisplay(algo);
 
-    // Return false to not suppress the standard parameter line at top
-    return false;
+    // Return true to indicate we've handled the display (suppress default parameter display)
+    return true;
 }
 
 // Custom UI handler - used for page navigation and per-page parameter routing
