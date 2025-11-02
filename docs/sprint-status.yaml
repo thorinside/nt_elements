@@ -47,7 +47,7 @@ development_status:
   1-8-bus-routing-and-audio-i-o: done
   1-9-desktop-testing-validation: done
   1-10-hardware-deployment-and-validation: done
-  1-11-sample-rate-mode-selection: ready-for-dev
+  1-11-sample-rate-mode-selection: done
   epic-1-retrospective: optional
   epic-2: backlog
   2-1-complete-parameter-page-system: ready-for-dev
