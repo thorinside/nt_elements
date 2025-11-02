@@ -865,3 +865,59 @@ These observations do not prevent story approval as they are edge cases that can
 **Review Status: APPROVED (LGTM)**
 
 Story 2.1 is complete and ready to move to "done" status. All parameter pages are fully functional with working control routing, page navigation, and proper architecture. The developer successfully addressed all feedback from the first review with a correct understanding of the NT API and a clean implementation.
+
+---
+
+## Post-Story Enhancements
+
+### 2025-11-02: Stereo Output + Essential CV Inputs Added
+
+**Stereo Output Implementation:**
+- Added separate Main Output and Aux Output parameters for stereo reverb routing
+- Main Output: Routes Elements' `temp_main_out` (dry/main signal) to bus 13 by default
+- Aux Output: Routes Elements' `temp_aux_out` (reverb/wet signal) to bus 14 by default
+- Each output has independent bus assignment and mix/replace mode control
+- Fixes OLED parameter display bug (added missing parameter name array entries)
+- Both outputs support thread-safe pointer validation for reload scenarios
+
+**Essential CV Inputs Added:**
+Based on typical Elements usage patterns, added 3 dedicated convenience CV inputs:
+
+1. **FM CV** (`kParamFMCV`):
+   - Modulates FM Amount parameter (bipolar, ±5V)
+   - Enables dynamic pitch modulation effects (vibrato, pitch warble)
+   - Complements existing V/Oct CV for expressive pitch control
+
+2. **Brightness CV** (`kParamBrightnessCV`):
+   - Modulates Resonator Brightness parameter (bipolar, ±5V)
+   - Most musically expressive timbral control
+   - Enables filter sweep effects and dynamic tone shaping
+
+3. **Expression CV** (`kParamExpressionCV`):
+   - Modulates Exciter levels (unipolar, 0-10V)
+   - Acts as dynamics/velocity control
+   - Scales bow/blow/strike levels for expressive performance
+
+**Implementation Details:**
+- CV modulation applied at control-rate in `step()` before audio processing
+- All CV inputs use first sample of block for control values
+- Proper clamping to prevent parameter overflow
+- CV parameters added to Routing page for easy discovery
+- Zero overhead when CV inputs not mapped
+
+**Parameter Count Update:**
+- Previous: 26 parameters
+- New: 29 parameters (added 3 CV inputs)
+- Total routing parameters on Page 5: 11 (MIDI Chan, V/Oct, Gate, FM, Brightness, Expression, plus I/O routing)
+
+**Build Status:**
+- ✅ Desktop test build: 219KB
+- ✅ Hardware build: 207KB
+- ✅ All warnings from Mutable Instruments library (expected, not plugin code)
+
+**Testing Recommendations:**
+1. Verify stereo reverb spread with Main + Aux outputs patched to different destinations
+2. Test FM CV with LFO for vibrato effects
+3. Test Brightness CV with envelope generator for filter sweeps
+4. Test Expression CV with velocity/pressure source for dynamics
+5. Confirm no conflicts between manual parameter changes and CV modulation

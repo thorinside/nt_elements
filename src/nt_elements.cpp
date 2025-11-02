@@ -52,7 +52,8 @@ static void setupUi(_NT_algorithm* self, _NT_float3& pots);
 static const _NT_parameter parameters[kNumParams] = {
     // System parameters
     NT_PARAMETER_AUDIO_INPUT("Input", 1, 1)
-    NT_PARAMETER_AUDIO_OUTPUT_WITH_MODE("Output", 1, 13)
+    NT_PARAMETER_AUDIO_OUTPUT_WITH_MODE("Main Output", 1, 13)
+    NT_PARAMETER_AUDIO_OUTPUT_WITH_MODE("Aux Output", 1, 14)
 
     // Page 1 - Exciter (5 parameters)
     { .name = "Bow Level", .min = 0, .max = 100, .def = 80, .unit = kNT_unitPercent, .scaling = 0, .enumStrings = NULL },
@@ -80,10 +81,13 @@ static const _NT_parameter parameters[kNumParams] = {
     { .name = "FM Amount", .min = 0, .max = 100, .def = 0, .unit = kNT_unitPercent, .scaling = 0, .enumStrings = NULL },
     { .name = "Exciter Cnt", .min = 0, .max = 100, .def = 50, .unit = kNT_unitPercent, .scaling = 0, .enumStrings = NULL },
 
-    // Page 5 - Routing (3 parameters: MIDI Chan 0=Off, 1-16=specific channel)
+    // Page 5 - Routing (MIDI Chan 0=Off, 1-16=specific channel + CV inputs)
     { .name = "MIDI Chan", .min = 0, .max = 16, .def = 1, .unit = kNT_unitNone, .scaling = 0, .enumStrings = NULL },
     NT_PARAMETER_CV_INPUT("V/Oct CV", 0, 0)
     NT_PARAMETER_CV_INPUT("Gate CV", 0, 0)
+    NT_PARAMETER_CV_INPUT("FM CV", 0, 0)
+    NT_PARAMETER_CV_INPUT("Bright CV", 0, 0)
+    NT_PARAMETER_CV_INPUT("Expr CV", 0, 0)
 };
 
 // Parameter pages for menu organization
@@ -105,7 +109,9 @@ static const uint8_t pagePerformance[] = {
 
 static const uint8_t pageRouting[] = {
     kParamInputBus, kParamOutputBus, kParamOutputMode,
-    kParamMidiChannel, kParamVOctCV, kParamGateCV
+    kParamAuxOutputBus, kParamAuxOutputMode,
+    kParamMidiChannel, kParamVOctCV, kParamGateCV,
+    kParamFMCV, kParamBrightnessCV, kParamExpressionCV
 };
 
 static const _NT_parameterPage pages[] = {
@@ -367,10 +373,18 @@ static void parameterChanged(_NT_algorithm* self, int p) {
             patch->exciter_envelope_shape = parameter_adapter::ntToElements(self->v[kParamExciterContour]);
             break;
 
-        // Bus routing parameters don't need handling (used directly in step())
+        // Bus routing and CV input parameters don't need handling (used directly in step())
         case kParamInputBus:
         case kParamOutputBus:
         case kParamOutputMode:
+        case kParamAuxOutputBus:
+        case kParamAuxOutputMode:
+        case kParamMidiChannel:
+        case kParamVOctCV:
+        case kParamGateCV:
+        case kParamFMCV:
+        case kParamBrightnessCV:
+        case kParamExpressionCV:
         default:
             break;
     }
@@ -457,6 +471,44 @@ static void step(_NT_algorithm* self, float* busFrames, int numFramesBy4) {
     float original_modulation = algo->perf_state.modulation;
     algo->perf_state.modulation = original_modulation + algo->tuning_offset_semitones;
 
+    // Apply CV modulation to patch parameters (control-rate using first sample)
+    elements::Patch* patch = algo->elements_part->mutable_patch();
+
+    // FM Amount CV modulation
+    const int fm_cv_bus = static_cast<int>(self->v[kParamFMCV]) - 1;
+    if (fm_cv_bus >= 0 && fm_cv_bus < 28 && busFrames) {
+        const float* fm_cv = busFrames + (fm_cv_bus * numFrames);
+        // CV range: -5V to +5V modulates FM amount (bipolar)
+        // Clamp to prevent excessive modulation
+        float fm_mod = fmaxf(-1.0f, fminf(1.0f, fm_cv[0] * 0.2f));
+        patch->modulation_frequency = fmaxf(0.0f, fminf(1.0f,
+            parameter_adapter::ntToElements(self->v[kParamFMAmount]) + fm_mod));
+    }
+
+    // Brightness CV modulation
+    const int brightness_cv_bus = static_cast<int>(self->v[kParamBrightnessCV]) - 1;
+    if (brightness_cv_bus >= 0 && brightness_cv_bus < 28 && busFrames) {
+        const float* brightness_cv = busFrames + (brightness_cv_bus * numFrames);
+        // CV range: -5V to +5V modulates brightness (bipolar)
+        float bright_mod = fmaxf(-1.0f, fminf(1.0f, brightness_cv[0] * 0.2f));
+        patch->resonator_brightness = fmaxf(0.0f, fminf(1.0f,
+            parameter_adapter::ntToElements(self->v[kParamBrightness]) + bright_mod));
+    }
+
+    // Expression CV modulation (affects exciter levels)
+    const int expression_cv_bus = static_cast<int>(self->v[kParamExpressionCV]) - 1;
+    if (expression_cv_bus >= 0 && expression_cv_bus < 28 && busFrames) {
+        const float* expression_cv = busFrames + (expression_cv_bus * numFrames);
+        // CV range: 0-10V modulates exciter strength (unipolar)
+        // Scale 0-10V to 0.0-1.0 multiplier
+        float expr_mod = fmaxf(0.0f, fminf(1.0f, expression_cv[0] * 0.1f));
+
+        // Apply expression to active exciter levels
+        patch->exciter_bow_level = parameter_adapter::ntToElements(self->v[kParamBowLevel]) * expr_mod;
+        patch->exciter_blow_level = parameter_adapter::ntToElements(self->v[kParamBlowLevel]) * expr_mod;
+        patch->exciter_strike_level = parameter_adapter::ntToElements(self->v[kParamStrikeLevel]) * expr_mod;
+    }
+
 #ifdef NT_EMU_DEBUG
     static int debug_counter = 0;
     if (++debug_counter % 1000 == 0) {
@@ -469,15 +521,23 @@ static void step(_NT_algorithm* self, float* busFrames, int numFramesBy4) {
     const int inputBus = static_cast<int>(self->v[kParamInputBus]) - 1;
     const int outputBus = static_cast<int>(self->v[kParamOutputBus]) - 1;
     const int outputMode = static_cast<int>(self->v[kParamOutputMode]);
+    const int auxOutputBus = static_cast<int>(self->v[kParamAuxOutputBus]) - 1;
+    const int auxOutputMode = static_cast<int>(self->v[kParamAuxOutputMode]);
 
     // Validate bus indices
-    if (inputBus < 0 || inputBus >= 28 || outputBus < 0 || outputBus >= 28) {
+    if (inputBus < 0 || inputBus >= 28 || outputBus < 0 || outputBus >= 28 || auxOutputBus < 0 || auxOutputBus >= 28) {
         return;
     }
 
-    // Get bus pointers
-    const float* input = busFrames + (inputBus * numFrames);
-    float* output = busFrames + (outputBus * numFrames);
+    // Get bus pointers (with null safety for reload scenarios)
+    const float* input = (busFrames && inputBus >= 0) ? busFrames + (inputBus * numFrames) : nullptr;
+    float* output = (busFrames && outputBus >= 0) ? busFrames + (outputBus * numFrames) : nullptr;
+    float* auxOutput = (busFrames && auxOutputBus >= 0) ? busFrames + (auxOutputBus * numFrames) : nullptr;
+
+    // Safety check: ensure all pointers are valid before processing
+    if (!input || !output || !auxOutput) {
+        return;
+    }
 
     // Elements' internal buffers operate on kMaxBlockSize (16) samples.
     // Slice disting NT blocks into safe chunks to avoid overruns on hardware.
@@ -509,7 +569,10 @@ static void step(_NT_algorithm* self, float* busFrames, int numFramesBy4) {
             static_cast<size_t>(kElementsBlockSize)
         );
 
+        // Get output chunk pointers (already validated above)
         float* outputChunk = output + offset;
+        float* auxOutputChunk = auxOutput + offset;
+
         if (outputMode == 1) {
             // Replace mode: copy with output level scaling
             for (int i = 0; i < chunk; ++i) {
@@ -519,6 +582,18 @@ static void step(_NT_algorithm* self, float* busFrames, int numFramesBy4) {
             // Mix mode: add with output level scaling
             for (int i = 0; i < chunk; ++i) {
                 outputChunk[i] += algo->temp_main_out[i] * algo->output_level_scale;
+            }
+        }
+
+        if (auxOutputMode == 1) {
+            // Replace mode: copy with output level scaling
+            for (int i = 0; i < chunk; ++i) {
+                auxOutputChunk[i] = algo->temp_aux_out[i] * algo->output_level_scale;
+            }
+        } else {
+            // Mix mode: add with output level scaling
+            for (int i = 0; i < chunk; ++i) {
+                auxOutputChunk[i] += algo->temp_aux_out[i] * algo->output_level_scale;
             }
         }
     }
