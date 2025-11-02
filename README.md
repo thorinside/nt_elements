@@ -1,190 +1,99 @@
 # nt_elements
 
-Mutable Instruments Elements modal synthesis port for the Expert Sleepers disting NT Eurorack module.
+Modal synthesis for disting NT, based on Mutable Instruments Elements.
 
-## Overview
+## Description
 
-This project ports the Mutable Instruments Elements physical modeling synthesizer to the disting NT platform, providing modal synthesis capabilities in a hardware Eurorack module.
+nt_elements brings the iconic Elements modal synthesis engine to the Expert Sleepers disting NT Eurorack module. Experience authentic physical modeling synthesis with 4 parameter pages covering exciters, resonators, reverb, and performance controls.
 
-## Prerequisites
+## Features
 
-### Required Software
+- Complete Elements DSP engine (bow/blow/strike exciters)
+- 64-filter modal resonator with geometry, brightness, damping controls
+- Stereo reverb with amount, size, damping parameters
+- 4 parameter pages organized: Exciter, Resonator, Space, Performance
+- MIDI note input with pitch bend support
+- 8 factory presets demonstrating diverse timbres
+- Preset save/load integration
+- 48kHz sample rate operation
+- CPU usage < 30% (typical operation)
 
-- **macOS** (tested on macOS 14.6+)
-- **ARM GCC Toolchain**: `brew install arm-none-eabi-gcc`
-- **Git**: For cloning and managing submodules
-- **Make**: Build system (included with Xcode Command Line Tools)
-- **VCV Rack v2.x**: Desktop testing environment
-  - Download from https://vcvrack.com/
-  - Install the **nt_emu** module from the VCV Rack Library
+## Installation
 
-### ARM Toolchain Installation
+1. Download `nt_elements.o` from the [releases page](https://github.com/yourusername/nt_elements/releases)
+2. Copy the file to your disting NT SD card (root directory or subdirectory)
+3. Insert SD card into disting NT
+4. Power on disting NT
+5. Navigate to file browser
+6. Select `nt_elements.o` to load plugin
+7. Plugin appears in algorithm list as "nt_elements"
 
-```bash
-brew install arm-none-eabi-gcc
-arm-none-eabi-g++ --version  # Verify installation
-```
+## Requirements
 
-Current version used: ARM Embedded Toolchain 14.3.Rel1
+- disting NT Eurorack module
+- disting NT firmware version 1.0 or later
+- SD card (FAT32 formatted)
+- MIDI controller (for note input, optional)
 
-## Project Setup
+## Usage
 
-### Clone and Initialize
+### Parameter Pages
 
-```bash
-# Clone repository (if not already done)
-git clone <repository-url>
-cd nt_elements
+nt_elements organizes parameters into 4 pages accessible via the button:
 
-# Initialize git submodules
-git submodule update --init --recursive
-```
+**Page 1: Exciter**
+- Controls the excitation method (bow, blow, strike)
+- Adjust contour, timbre, and bow/blow balance
 
-### Submodules
+**Page 2: Resonator**
+- Shape the resonator response
+- Control geometry, brightness, damping, position, inharmonicity
 
-This project uses two git submodules:
+**Page 3: Space**
+- Stereo reverb parameters
+- Amount, size, damping
 
-1. **distingNT_API** - Expert Sleepers disting NT plugin API (v9)
-2. **external/mutable-instruments** - Mutable Instruments Elements source code (MIT License)
+**Page 4: Performance**
+- Global controls
+- Tuning, FM amount, output level
 
-**Important**: Never modify files in git submodules. All customization happens in the `src/` adapter layer.
+### MIDI Control
 
-## Building
+Send MIDI notes to the configured MIDI channel to trigger synthesis. Pitch bend is supported for expressive performance.
 
-The project uses a dual-target build system:
+### Factory Presets
 
-### Desktop Test Build
+8 factory presets are included demonstrating various timbres:
+- Bell Strike
+- Bowed String
+- Blown Pipe
+- Drum Hit
+- Harmonic Pad
+- Metallic Pluck
+- Resonant Sweep
+- Ethereal Voices
 
-Builds a native `.dylib` (macOS) or `.so` (Linux) for testing in VCV Rack:
+## Credits
 
-```bash
-make test
-```
+nt_elements is a port of Mutable Instruments Elements modal synthesis engine to the Expert Sleepers disting NT platform.
 
-Output: `plugins/nt_elements.dylib`
+Original Elements DSP code: Copyright (c) 2013-2014 Emilie Gillet, Mutable Instruments
+Port to disting NT: Copyright (c) 2025 Neal Sanche
 
-### Hardware Build
+## Building from Source
 
-Builds ARM Cortex-M7 `.o` file for disting NT hardware:
-
-```bash
-make hardware
-```
-
-Output: `plugins/nt_elements.o` (< 2KB for minimal stub)
-
-### Clean Build
-
-Remove all build artifacts:
-
-```bash
-make clean
-```
-
-## Testing
-
-### Desktop Testing with VCV Rack
-
-1. Build the test plugin: `make test`
-2. Launch VCV Rack
-3. Add the **nt_emu** module to your patch
-4. Right-click nt_emu → **Load plugin**
-5. Navigate to `plugins/nt_elements.dylib`
-6. Select the plugin
-
-The plugin should load without errors. Check VCV Rack's log (Help → Show Log) for any warnings.
-
-### Hardware Deployment
-
-Hardware deployment will be covered in Story 1.10. The `.o` file produced by `make hardware` is ready for deployment to disting NT.
-
-## Project Structure
-
-```
-nt_elements/
-├── distingNT_API/          # Git submodule - Expert Sleepers API
-├── external/
-│   └── mutable-instruments/ # Git submodule - Elements source
-├── src/                    # Adapter code (our code)
-│   └── nt_elements.cpp     # Main plugin implementation
-├── plugins/                # Build output
-│   ├── nt_elements.dylib   # Desktop test build
-│   └── nt_elements.o       # Hardware build
-├── build/                  # Intermediate build artifacts
-├── Makefile               # Build system
-└── README.md              # This file
-```
-
-## Development Workflow
-
-This project follows a **desktop-first development workflow**:
-
-1. Develop and iterate using nt_emu (fast, printf debugging available)
-2. Test thoroughly on desktop
-3. Build hardware version and validate on disting NT at milestones
-
-## Memory Management
-
-All memory allocation **must** use `NT_globals.getMemory()` - never use `malloc`/`new`.
-
-Memory regions:
-- **DTC**: Ultra-fast, small (~64KB) - for hot state and parameters
-- **SRAM**: Fast, medium (~128KB) - for audio buffers and processing state
-- **DRAM**: Large, slower (~8MB) - for reverb buffers
+For developers wanting to build from source, see [DEVELOPMENT.md](DEVELOPMENT.md) for detailed build instructions.
 
 ## License
 
-This project is licensed under the MIT License.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-### Attribution
+## Support
 
-Based on **Mutable Instruments Elements** by Emilie Gillet (MIT License)
-- Copyright 2014 Emilie Gillet
-- Source: https://github.com/pichenettes/eurorack
+For issues, questions, or feedback:
+- Open an issue on GitHub
+- Join the discussion on the disting NT Discord
 
-Uses **Expert Sleepers distingNT API** (MIT License)
-- Copyright 2025 Expert Sleepers Ltd
+## Version
 
-## Current Status
-
-- ✅ Development environment setup complete
-- ✅ ARM toolchain installed and verified (v14.3.1)
-- ✅ Git submodules initialized (distingNT_API, Mutable Instruments Elements)
-- ✅ VCV Rack with nt_emu ready for desktop testing
-- ✅ Minimal "hello world" plugin compiles for both desktop and hardware
-- ⏳ Elements DSP integration - next step
-
-## Build System Details
-
-### Compiler Flags
-
-**Hardware (ARM Cortex-M7)**:
-```
--std=c++11 -mcpu=cortex-m7 -mfpu=fpv5-d16 -mfloat-abi=hard
--Os -fno-rtti -fno-exceptions
-```
-
-**Desktop Test**:
-```
--std=c++11 -O2 -fPIC -fno-rtti -fno-exceptions
-```
-
-### Include Paths
-
-- `distingNT_API/include` - distingNT plugin API headers
-
-Future stories will add Elements DSP and stmlib include paths.
-
-## Resources
-
-- [disting NT Manual](https://www.expert-sleepers.co.uk/distingNT.html)
-- [VCV Rack Documentation](https://vcvrack.com/manual/)
-- [Mutable Instruments Elements](https://mutable-instruments.net/modules/elements/)
-- [Elements Source Code](https://github.com/pichenettes/eurorack)
-
-## Versions
-
-- **ARM GCC Toolchain**: 14.3.1 (arm-14.174)
-- **distingNT API**: v9
-- **VCV Rack**: v2.x
-- **nt_emu**: Latest from VCV Library
+v1.0.0 - Initial Release

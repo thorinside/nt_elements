@@ -1,10 +1,8 @@
 /*
  * oled_display.cpp - OLED display rendering implementation for nt_elements
  *
- * Implements display rendering functions for the disting NT OLED screen.
- *
- * Copyright (c) 2025
- * Licensed under MIT License
+ * Copyright (c) 2025 Neal Sanche
+ * Licensed under MIT License - see LICENSE file for details
  */
 
 #include "oled_display.h"

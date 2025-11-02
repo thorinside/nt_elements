@@ -1,11 +1,11 @@
 /*
  * nt_elements - Mutable Instruments Elements port for disting NT
  *
- * Story 1.4: Elements Part Instance Integration
- * Instantiates Elements::Part and routes audio through modal synthesis DSP.
+ * Copyright (c) 2025 Neal Sanche
+ * Based on Mutable Instruments Elements
+ * Copyright (c) 2013-2014 Emilie Gillet
  *
- * Copyright (c) 2025
- * Licensed under MIT License
+ * Licensed under MIT License - see LICENSE file for details
  */
 
 #include <cstddef>
