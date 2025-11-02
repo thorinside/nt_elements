@@ -1,17 +1,18 @@
---- a/external/mutable-instruments/elements/dsp/dsp.h	2025-11-02 00:00:00.000000000 -0700
-+++ b/external/mutable-instruments/elements/dsp/dsp.h	2025-11-02 00:00:00.000000000 -0700
-@@ -32,10 +32,28 @@
- #include "stmlib/stmlib.h"
-
+diff --git a/elements/dsp/dsp.h b/elements/dsp/dsp.h
+index f3292da..6be0724 100644
+--- a/elements/dsp/dsp.h
++++ b/elements/dsp/dsp.h
+@@ -33,11 +33,24 @@
+ 
  #include <cmath>
-+
+ 
 +// nt_elements modification: Use disting NT's dynamic sample rate
 +// Original: static const float kSampleRate = 32000.0f;
 +// Modified to adapt to NT_globals.sampleRate (user-configurable)
 +#include "distingnt/api.h"
-
++
  namespace elements {
--
+-  
 -static const float kSampleRate = 32000.0f;
 +
 +// Dynamic sample rate from disting NT (32/48/96kHz user-configurable)
@@ -21,10 +22,10 @@
 +}
 +
  const size_t kMaxBlockSize = 16;
-
+ 
  }  // namespace elements
-+
+ 
 +// Macro to make kSampleRate a function call wherever it appears
 +#define kSampleRate elements::get_sample_rate()
-
++
  #endif  // ELEMENTS_DSP_DSP_H_
