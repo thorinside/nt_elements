@@ -227,9 +227,6 @@ static _NT_algorithm* construct(const _NT_algorithmMemoryPtrs& ptrs, const _NT_a
     // Initialize output level (default = 100% = full volume)
     self->output_level_scale = 1.0f;
 
-    // Initialize display state (start with dirty flag set to render initial display)
-    self->display_dirty = true;
-
     // Initialize default patch parameters (balanced modal sound)
     elements::Patch* patch = self->elements_part->mutable_patch();
 
@@ -265,11 +262,19 @@ static _NT_algorithm* construct(const _NT_algorithmMemoryPtrs& ptrs, const _NT_a
 }
 
 static void parameterChanged(_NT_algorithm* self, int p) {
-    nt_elementsAlgorithm* algo = static_cast<nt_elementsAlgorithm*>(self);
-    elements::Patch* patch = algo->elements_part->mutable_patch();
+    // Defensive validation: Check for null pointer (protection against emulator reload race conditions)
+    if (!self) {
+        return;
+    }
 
-    // Mark display dirty for parameter changes
-    algo->display_dirty = true;
+    nt_elementsAlgorithm* algo = static_cast<nt_elementsAlgorithm*>(self);
+
+    // Validate algorithm structure integrity
+    if (!algo->elements_part) {
+        return;  // Plugin being destroyed during reload
+    }
+
+    elements::Patch* patch = algo->elements_part->mutable_patch();
 
     // Convert NT parameters (0-100%) to Elements Patch fields (0.0-1.0)
     switch (p) {
@@ -366,7 +371,18 @@ static void parameterChanged(_NT_algorithm* self, int p) {
 }
 
 static void step(_NT_algorithm* self, float* busFrames, int numFramesBy4) {
+    // Defensive validation: Check for null pointers (protection against emulator reload race conditions)
+    if (!self || !busFrames) {
+        return;
+    }
+
     nt_elementsAlgorithm* algo = static_cast<nt_elementsAlgorithm*>(self);
+
+    // Validate algorithm structure integrity
+    if (!algo->elements_part || !algo->temp_blow_in || !algo->temp_strike_in ||
+        !algo->temp_main_out || !algo->temp_aux_out) {
+        return;  // Plugin being destroyed during reload
+    }
 
     // Apply pending MIDI updates atomically (thread-safe)
     if (algo->pending_update) {
@@ -424,30 +440,28 @@ static void step(_NT_algorithm* self, float* busFrames, int numFramesBy4) {
         const int remaining = numFrames - offset;
         const int chunk = remaining >= kElementsBlockSize ? kElementsBlockSize : remaining;
 
-        if (algo->perf_state.gate) {
-            // Copy current sub-block. For partial chunks, extend with the last sample
-            // to avoid hard transitions that would create clicks.
-            const float* inputChunk = input + offset;
-            memcpy(algo->temp_blow_in, inputChunk, chunk * sizeof(float));
-            if (chunk < kElementsBlockSize) {
-                const float padValue = chunk > 0 ? inputChunk[chunk - 1] : 0.0f;
-                for (int i = chunk; i < kElementsBlockSize; ++i) {
-                    algo->temp_blow_in[i] = padValue;
-                }
+        // Copy current sub-block. For partial chunks, extend with the last sample
+        // to avoid hard transitions that would create clicks.
+        const float* inputChunk = input + offset;
+        memcpy(algo->temp_blow_in, inputChunk, chunk * sizeof(float));
+        if (chunk < kElementsBlockSize) {
+            const float padValue = chunk > 0 ? inputChunk[chunk - 1] : 0.0f;
+            for (int i = chunk; i < kElementsBlockSize; ++i) {
+                algo->temp_blow_in[i] = padValue;
             }
-            memset(algo->temp_strike_in, 0, kElementsBlockSize * sizeof(float));
-
-            algo->elements_part->Process(
-                algo->perf_state,
-                algo->temp_blow_in,
-                algo->temp_strike_in,
-                algo->temp_main_out,
-                algo->temp_aux_out,
-                static_cast<size_t>(kElementsBlockSize)
-            );
-        } else {
-            memset(algo->temp_main_out, 0, kElementsBlockSize * sizeof(float));
         }
+        memset(algo->temp_strike_in, 0, kElementsBlockSize * sizeof(float));
+
+        // Always process audio - Elements will use gate state internally to control exciter
+        // but the resonator should always respond to audio input
+        algo->elements_part->Process(
+            algo->perf_state,
+            algo->temp_blow_in,
+            algo->temp_strike_in,
+            algo->temp_main_out,
+            algo->temp_aux_out,
+            static_cast<size_t>(kElementsBlockSize)
+        );
 
         float* outputChunk = output + offset;
         if (outputMode == 1) {
@@ -469,32 +483,44 @@ static void step(_NT_algorithm* self, float* busFrames, int numFramesBy4) {
 
 // Draw callback - render OLED display
 static bool draw(_NT_algorithm* self) {
-    nt_elementsAlgorithm* algo = static_cast<nt_elementsAlgorithm*>(self);
-
-    // Only redraw if display is dirty (parameter or page changed)
-    if (!algo->display_dirty) {
-        return false;  // Don't suppress standard parameter line
+    // Defensive validation: Check for null pointer (protection against emulator reload race conditions)
+    if (!self) {
+        return false;
     }
 
-    // Render the display
-    oled_display::renderDisplay(algo);
+    nt_elementsAlgorithm* algo = static_cast<nt_elementsAlgorithm*>(self);
 
-    // Clear dirty flag
-    algo->display_dirty = false;
+    // Validate algorithm structure integrity
+    if (!algo->elements_part) {
+        return false;  // Plugin being destroyed during reload
+    }
+
+    // Always render the display (distingNT calls draw() continuously)
+    oled_display::renderDisplay(algo);
 
     // Return false to not suppress the standard parameter line at top
     return false;
 }
 
-// Custom UI handler - used for page navigation via button presses and pot/encoder routing
+// Custom UI handler - used for page navigation via button presses
 static uint32_t hasCustomUi(_NT_algorithm* /*self*/) {
-    // We handle buttons 1 and 2 for page navigation (prev/next)
-    // We also handle all pots and encoders for per-page parameter routing
-    return kNT_button1 | kNT_button2 | kNT_potL | kNT_potC | kNT_potR | kNT_encoderL | kNT_encoderR;
+    // We only handle buttons 1 and 2 for page navigation (prev/next)
+    // Pots and encoders use the standard parameter system
+    return kNT_button1 | kNT_button2;
 }
 
 static void customUi(_NT_algorithm* self, const _NT_uiData& data) {
+    // Defensive validation: Check for null pointer (protection against emulator reload race conditions)
+    if (!self) {
+        return;
+    }
+
     nt_elementsAlgorithm* algo = static_cast<nt_elementsAlgorithm*>(self);
+
+    // Validate algorithm structure integrity
+    if (!algo->elements_part) {
+        return;  // Plugin being destroyed during reload
+    }
 
     // Get current and last button states
     uint16_t current_buttons = data.controls & 0xFFFF;
@@ -511,7 +537,6 @@ static void customUi(_NT_algorithm* self, const _NT_uiData& data) {
     // Button 1: Previous page (encoder 1 button)
     if (button1_pressed) {
         algo->current_page = (algo->current_page - 1 + kNumPages) % kNumPages;
-        algo->display_dirty = true;  // Mark display dirty for page change
 #ifdef NT_EMU_DEBUG
         printf("Page navigation: Button 1 -> Page %d (%s)\n",
                algo->current_page, PAGE_MAPPINGS[algo->current_page].name);
@@ -521,7 +546,6 @@ static void customUi(_NT_algorithm* self, const _NT_uiData& data) {
     // Button 2: Next page (encoder 2 button)
     if (button2_pressed) {
         algo->current_page = (algo->current_page + 1) % kNumPages;
-        algo->display_dirty = true;  // Mark display dirty for page change
 #ifdef NT_EMU_DEBUG
         printf("Page navigation: Button 2 -> Page %d (%s)\n",
                algo->current_page, PAGE_MAPPINGS[algo->current_page].name);
@@ -535,11 +559,12 @@ static void customUi(_NT_algorithm* self, const _NT_uiData& data) {
     // Get current page mapping
     const PageMapping& page = PAGE_MAPPINGS[algo->current_page];
 
-    // Handle pot changes - pots provide absolute values (0.0-1.0)
-    // When we intercept pots/encoders via customUi, we bypass the NT parameter system
-    // and directly update the Elements Patch. This allows performance-oriented control
-    // where pots change function based on the current page.
+    // Note: Pot/encoder handling is done through the standard parameter system (parameterChanged callback)
+    // We only handle button presses here for page navigation
+    // This avoids conflicts with the menu system
 
+    // Pot/encoder code commented out - using standard parameter system instead
+    /*
     elements::Patch* patch = algo->elements_part->mutable_patch();
 
     // Check which pots changed using the controls bitmask
@@ -550,10 +575,8 @@ static void customUi(_NT_algorithm* self, const _NT_uiData& data) {
             int param_index = page.pot_mapping[i];
             float pot_value = data.pots[i];  // 0.0-1.0 from hardware
 
-            // Mark display dirty for pot change
-            algo->display_dirty = true;
-
             // Update Elements Patch directly based on parameter mapping
+            // Note: Pot values come through parameterChanged() callback, not here
             switch (param_index) {
                 // Page 1 - Exciter
                 case kParamBowLevel:
@@ -626,9 +649,6 @@ static void customUi(_NT_algorithm* self, const _NT_uiData& data) {
                 continue;  // Encoder not assigned on this page
             }
 
-            // Mark display dirty for encoder change
-            algo->display_dirty = true;
-
             // Get current value from v[] (which is managed by framework for menu parameters)
             // For performance controls, we need to maintain state
             float step_size = 0.01f;  // 1% per detent
@@ -646,6 +666,7 @@ static void customUi(_NT_algorithm* self, const _NT_uiData& data) {
             if (new_value > 1.0f) new_value = 1.0f;
 
             // Update Elements Patch directly based on parameter mapping
+            // Note: Encoder values come through parameterChanged() callback, not here
             switch (param_index) {
                 // Page 1 - Exciter
                 case kParamBowTimbre:
@@ -681,10 +702,25 @@ static void customUi(_NT_algorithm* self, const _NT_uiData& data) {
 #endif
         }
     }
+    */
+
+    // Suppress unused variable warnings
+    (void)data;
+    (void)page;
 }
 
 static void setupUi(_NT_algorithm* self, _NT_float3& pots) {
+    // Defensive validation: Check for null pointer (protection against emulator reload race conditions)
+    if (!self) {
+        return;
+    }
+
     nt_elementsAlgorithm* algo = static_cast<nt_elementsAlgorithm*>(self);
+
+    // Validate algorithm structure integrity
+    if (!algo->elements_part) {
+        return;  // Plugin being destroyed during reload
+    }
 
     // Get current page mapping
     const PageMapping& page = PAGE_MAPPINGS[algo->current_page];
@@ -701,7 +737,17 @@ static void setupUi(_NT_algorithm* self, _NT_float3& pots) {
 }
 
 static void midiMessage(_NT_algorithm* self, uint8_t b0, uint8_t b1, uint8_t b2) {
+    // Defensive validation: Check for null pointer (protection against emulator reload race conditions)
+    if (!self) {
+        return;
+    }
+
     nt_elementsAlgorithm* algo = static_cast<nt_elementsAlgorithm*>(self);
+
+    // Validate algorithm structure integrity
+    if (!algo->elements_part) {
+        return;  // Plugin being destroyed during reload
+    }
 
     // Parse MIDI message
     const uint8_t status = b0 & 0xF0;

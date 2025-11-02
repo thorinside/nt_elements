@@ -49,9 +49,6 @@ struct nt_elementsAlgorithm : public _NT_algorithm {
 
     // Output scaling
     float output_level_scale;
-
-    // Display state
-    bool display_dirty;
 };
 
 #endif // NT_ELEMENTS_H_
