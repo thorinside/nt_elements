@@ -49,7 +49,9 @@ CXXFLAGS_ARM = $(CXXFLAGS_COMMON) $(DEFINES_HARDWARE) \
 	-mcpu=cortex-m7 \
 	-mfpu=fpv5-d16 \
 	-mfloat-abi=hard \
-	-Os \
+	-O3 \
+	-ffast-math \
+	-funroll-loops \
 	-fdata-sections \
 	-ffunction-sections
 

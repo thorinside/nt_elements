@@ -807,18 +807,26 @@ namespace elements {
 
 **Context**: Elements includes reverb, but disting NT already has Clouds reverb available.
 
-**Decision**: Include reverb but make it bypassable (skip processing when Amount = 0).
+**Decision**: Include reverb but make it bypassable via user-adjustable amount parameter. **NOTE:** True bypass (skipping reverb DSP processing) cannot be implemented due to architectural constraints.
 
 **Rationale**:
 - Preserves Elements character (reverb is part of the sound)
 - Users can choose: built-in reverb OR route to external effects
-- Bypass saves ~5-10% CPU when unused
 - Flexibility without removing functionality
 
+**Implementation Limitation**:
+- Reverb processing occurs inside `elements::Part::Process()` within the read-only Elements submodule
+- Cannot modify Elements submodule source code (external dependency constraint)
+- Setting reverb amount to 0% mutes the wet signal output but reverb DSP still runs
+- **True bypass (skipping reverb processing) is not possible** without forking Elements submodule
+- Reverb consumes ~7-10% CPU even when amount is set to 0%
+
 **Consequences**:
-- Slightly more complex step() logic (conditional processing)
-- Must allocate reverb buffer even if bypassed (or dynamic allocation)
+- Reverb always runs consuming ~7-10% CPU regardless of amount setting
+- Users can minimize reverb wet signal contribution by setting amount to 0%
+- Must allocate reverb buffer (cannot be avoided)
 - Page 3 remains useful (reverb controls)
+- Future optimization: Could fork Elements submodule to implement true bypass if CPU budget requires it
 
 ---
 
