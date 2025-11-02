@@ -215,9 +215,6 @@ static _NT_algorithm* construct(const _NT_algorithmMemoryPtrs& ptrs, const _NT_a
     self->pending_state.modulation = 0.0f;
     self->pending_state.strength = 0.8f;
 
-    // Initialize button state
-    self->last_button_state = 0;
-
     // Initialize page navigation (start on Page 1 - Exciter)
     self->current_page = kPageExciter;
 
@@ -529,12 +526,9 @@ static void customUi(_NT_algorithm* self, const _NT_uiData& data) {
     // Get current and last button states
     uint16_t current_buttons = data.controls & 0xFFFF;
 
-    // Detect encoder button press events (rising edge detection)
-    bool encoderL_pressed = (current_buttons & kNT_encoderButtonL) && !(algo->last_button_state & kNT_encoderButtonL);
-    bool encoderR_pressed = (current_buttons & kNT_encoderButtonR) && !(algo->last_button_state & kNT_encoderButtonR);
-
-    // Save current state for next call
-    algo->last_button_state = current_buttons;
+    // Detect encoder button press events using lastButtons from uiData (which tracks previous state)
+    bool encoderL_pressed = (current_buttons & kNT_encoderButtonL) && !(data.lastButtons & kNT_encoderButtonL);
+    bool encoderR_pressed = (current_buttons & kNT_encoderButtonR) && !(data.lastButtons & kNT_encoderButtonR);
 
     // Encoder 1 button: Previous page (wraps around)
     if (encoderL_pressed) {
