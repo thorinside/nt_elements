@@ -38,9 +38,6 @@ struct nt_elementsAlgorithm : public _NT_algorithm {
     volatile bool pending_update;
     elements::PerformanceState pending_state;
 
-    // Button debouncing
-    uint16_t last_button_state;
-
     // Page navigation state
     int current_page;
 
