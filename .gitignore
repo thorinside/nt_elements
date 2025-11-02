@@ -17,5 +17,8 @@ plugins/*.so
 # Compiled Object files
 *.o
 
+# Patch marker files
+.nt_elements_patched
+
 # Note: We keep plugins/ directory but ignore built libraries
 # Hardware .o files may be committed for deployment tracking
