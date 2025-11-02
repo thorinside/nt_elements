@@ -31,6 +31,7 @@
 #define DIAG_BUTTON4_MARKER     0x44  // Changed from 0xB4 (Button 4 -> 0x44)
 
 #include "parameter_adapter.h"
+#include "parameter_pages.h"
 
 // Algorithm structure with Elements integration
 struct nt_elementsAlgorithm : public _NT_algorithm {
@@ -58,6 +59,15 @@ struct nt_elementsAlgorithm : public _NT_algorithm {
 
     // Button debouncing (track last button state to avoid bouncing)
     uint16_t last_button_state;
+
+    // Page navigation state
+    int current_page;  // 0-3 for pages 1-4 (kPageExciter, kPageResonator, kPageSpace, kPagePerformance)
+
+    // Tuning state (derived from kParamCoarseTune and kParamFineTune)
+    float tuning_offset_semitones;  // Total tuning offset in semitones
+
+    // Output scaling (derived from kParamOutputLevel)
+    float output_level_scale;  // 0.0-1.0 output volume scaling
 };
 
 // Factory functions forward declarations
@@ -70,31 +80,67 @@ static void step(_NT_algorithm* self, float* busFrames, int numFramesBy4);
 static void midiMessage(_NT_algorithm* self, uint8_t b0, uint8_t b1, uint8_t b2);
 static uint32_t hasCustomUi(_NT_algorithm* self);
 static void customUi(_NT_algorithm* self, const _NT_uiData& data);
+static void setupUi(_NT_algorithm* self, _NT_float3& pots);
 
 // Parameter definitions
 static const _NT_parameter parameters[kNumParams] = {
+    // System parameters
     NT_PARAMETER_AUDIO_INPUT("Input", 1, 1)
     NT_PARAMETER_AUDIO_OUTPUT_WITH_MODE("Output", 1, 13)
+
+    // Page 1 - Exciter (5 parameters)
+    { .name = "Bow Level", .min = 0, .max = 100, .def = 80, .unit = kNT_unitPercent, .scaling = 0, .enumStrings = NULL },
+    { .name = "Blow Level", .min = 0, .max = 100, .def = 0, .unit = kNT_unitPercent, .scaling = 0, .enumStrings = NULL },
+    { .name = "Strike Level", .min = 0, .max = 100, .def = 0, .unit = kNT_unitPercent, .scaling = 0, .enumStrings = NULL },
+    { .name = "Bow Timbre", .min = 0, .max = 100, .def = 50, .unit = kNT_unitPercent, .scaling = 0, .enumStrings = NULL },
+    { .name = "Blow Timbre", .min = 0, .max = 100, .def = 50, .unit = kNT_unitPercent, .scaling = 0, .enumStrings = NULL },
+
+    // Page 2 - Resonator (5 parameters)
     { .name = "Geometry", .min = 0, .max = 100, .def = 50, .unit = kNT_unitPercent, .scaling = 0, .enumStrings = NULL },
     { .name = "Brightness", .min = 0, .max = 100, .def = 70, .unit = kNT_unitPercent, .scaling = 0, .enumStrings = NULL },
     { .name = "Damping", .min = 0, .max = 100, .def = 60, .unit = kNT_unitPercent, .scaling = 0, .enumStrings = NULL },
+    { .name = "Position", .min = 0, .max = 100, .def = 50, .unit = kNT_unitPercent, .scaling = 0, .enumStrings = NULL },
+    { .name = "Inharmonic", .min = 0, .max = 100, .def = 0, .unit = kNT_unitPercent, .scaling = 0, .enumStrings = NULL },
+
+    // Page 3 - Space (3 parameters)
+    { .name = "Reverb Amt", .min = 0, .max = 100, .def = 20, .unit = kNT_unitPercent, .scaling = 0, .enumStrings = NULL },
+    { .name = "Reverb Size", .min = 0, .max = 100, .def = 50, .unit = kNT_unitPercent, .scaling = 0, .enumStrings = NULL },
+    { .name = "Reverb Damp", .min = 0, .max = 100, .def = 70, .unit = kNT_unitPercent, .scaling = 0, .enumStrings = NULL },
+
+    // Page 4 - Performance (5 parameters)
+    { .name = "Coarse Tune", .min = 0, .max = 100, .def = 50, .unit = kNT_unitPercent, .scaling = 0, .enumStrings = NULL },
+    { .name = "Fine Tune", .min = 0, .max = 100, .def = 50, .unit = kNT_unitPercent, .scaling = 0, .enumStrings = NULL },
+    { .name = "Output Lvl", .min = 0, .max = 100, .def = 100, .unit = kNT_unitPercent, .scaling = 0, .enumStrings = NULL },
+    { .name = "FM Amount", .min = 0, .max = 100, .def = 0, .unit = kNT_unitPercent, .scaling = 0, .enumStrings = NULL },
+    { .name = "Exciter Cnt", .min = 0, .max = 100, .def = 50, .unit = kNT_unitPercent, .scaling = 0, .enumStrings = NULL },
 };
 
 // Parameter pages for menu organization
+static const uint8_t pageExciter[] = {
+    kParamBowLevel, kParamBlowLevel, kParamStrikeLevel, kParamBowTimbre, kParamBlowTimbre
+};
+
 static const uint8_t pageResonator[] = {
-    kParamGeometry,
-    kParamBrightness,
-    kParamDamping
+    kParamGeometry, kParamBrightness, kParamDamping, kParamResonatorPosition, kParamInharmonicity
+};
+
+static const uint8_t pageSpace[] = {
+    kParamReverbAmount, kParamReverbSize, kParamReverbDamping
+};
+
+static const uint8_t pagePerformance[] = {
+    kParamCoarseTune, kParamFineTune, kParamOutputLevel, kParamFMAmount, kParamExciterContour
 };
 
 static const uint8_t pageRouting[] = {
-    kParamInputBus,
-    kParamOutputBus,
-    kParamOutputMode
+    kParamInputBus, kParamOutputBus, kParamOutputMode
 };
 
 static const _NT_parameterPage pages[] = {
+    { .name = "Exciter", .numParams = sizeof(pageExciter), .params = pageExciter },
     { .name = "Resonator", .numParams = sizeof(pageResonator), .params = pageResonator },
+    { .name = "Space", .numParams = sizeof(pageSpace), .params = pageSpace },
+    { .name = "Performance", .numParams = sizeof(pagePerformance), .params = pagePerformance },
     { .name = "Routing", .numParams = sizeof(pageRouting), .params = pageRouting },
 };
 
@@ -122,7 +168,7 @@ static const _NT_factory factory = {
     .tags = kNT_tagInstrument,
     .hasCustomUi = hasCustomUi,
     .customUi = customUi,
-    .setupUi = NULL
+    .setupUi = setupUi
 };
 
 // Factory implementations
@@ -206,6 +252,15 @@ static _NT_algorithm* construct(const _NT_algorithmMemoryPtrs& ptrs, const _NT_a
     // Initialize button state
     self->last_button_state = 0;
 
+    // Initialize page navigation (start on Page 1 - Exciter)
+    self->current_page = kPageExciter;
+
+    // Initialize tuning offset (centered = no offset)
+    self->tuning_offset_semitones = 0.0f;
+
+    // Initialize output level (default = 100% = full volume)
+    self->output_level_scale = 1.0f;
+
     // Initialize default patch parameters (balanced modal sound)
     elements::Patch* patch = self->elements_part->mutable_patch();
 
@@ -246,6 +301,28 @@ static void parameterChanged(_NT_algorithm* self, int p) {
 
     // Convert NT parameters (0-100%) to Elements Patch fields (0.0-1.0)
     switch (p) {
+        // Page 1 - Exciter parameters
+        case kParamBowLevel:
+            patch->exciter_bow_level = parameter_adapter::ntToElements(self->v[kParamBowLevel]);
+            break;
+
+        case kParamBlowLevel:
+            patch->exciter_blow_level = parameter_adapter::ntToElements(self->v[kParamBlowLevel]);
+            break;
+
+        case kParamStrikeLevel:
+            patch->exciter_strike_level = parameter_adapter::ntToElements(self->v[kParamStrikeLevel]);
+            break;
+
+        case kParamBowTimbre:
+            patch->exciter_bow_timbre = parameter_adapter::ntToElements(self->v[kParamBowTimbre]);
+            break;
+
+        case kParamBlowTimbre:
+            patch->exciter_blow_timbre = parameter_adapter::ntToElements(self->v[kParamBlowTimbre]);
+            break;
+
+        // Page 2 - Resonator parameters
         case kParamGeometry:
             patch->resonator_geometry = parameter_adapter::ntToElements(self->v[kParamGeometry]);
             break;
@@ -256,6 +333,55 @@ static void parameterChanged(_NT_algorithm* self, int p) {
 
         case kParamDamping:
             patch->resonator_damping = parameter_adapter::ntToElements(self->v[kParamDamping]);
+            break;
+
+        case kParamResonatorPosition:
+            patch->resonator_position = parameter_adapter::ntToElements(self->v[kParamResonatorPosition]);
+            break;
+
+        case kParamInharmonicity:
+            patch->resonator_modulation_frequency = parameter_adapter::ntToElements(self->v[kParamInharmonicity]);
+            break;
+
+        // Page 3 - Space (Reverb) parameters
+        case kParamReverbAmount:
+            patch->space = parameter_adapter::ntToElements(self->v[kParamReverbAmount]);
+            break;
+
+        case kParamReverbSize:
+            patch->reverb_lp = parameter_adapter::ntToElements(self->v[kParamReverbSize]);
+            break;
+
+        case kParamReverbDamping:
+            patch->reverb_diffusion = parameter_adapter::ntToElements(self->v[kParamReverbDamping]);
+            break;
+
+        // Page 4 - Performance parameters
+        case kParamCoarseTune:
+        case kParamFineTune:
+            {
+                // Coarse tune: 0-100% maps to -12 to +12 semitones
+                float coarse_semitones = (self->v[kParamCoarseTune] - 50.0f) * 0.24f;  // (x - 50) * 24/100
+
+                // Fine tune: 0-100% maps to -50 to +50 cents
+                float fine_cents = (self->v[kParamFineTune] - 50.0f) * 1.0f;  // (x - 50) * 100/100
+
+                // Combine: total offset in semitones
+                algo->tuning_offset_semitones = coarse_semitones + (fine_cents / 100.0f);
+            }
+            break;
+
+        case kParamOutputLevel:
+            // Output level: 0-100% maps to 0.0-1.0 scaling
+            algo->output_level_scale = parameter_adapter::ntToElements(self->v[kParamOutputLevel]);
+            break;
+
+        case kParamFMAmount:
+            patch->modulation_frequency = parameter_adapter::ntToElements(self->v[kParamFMAmount]);
+            break;
+
+        case kParamExciterContour:
+            patch->exciter_envelope_shape = parameter_adapter::ntToElements(self->v[kParamExciterContour]);
             break;
 
         // Bus routing parameters don't need handling (used directly in step())
@@ -282,6 +408,12 @@ static void step(_NT_algorithm* self, float* busFrames, int numFramesBy4) {
         __asm__ volatile("" ::: "memory");
         algo->pending_update = false;
     }
+
+    // Apply tuning offset to MIDI note
+    // Elements::Part stores note as MIDI note number, modulation is added during processing
+    // We add our tuning offset to the modulation field
+    float original_modulation = algo->perf_state.modulation;
+    algo->perf_state.modulation = original_modulation + algo->tuning_offset_semitones;
 
     // busFrames layout: [bus0_frames][bus1_frames]...[bus27_frames]
     const int numFrames = numFramesBy4 * 4;
@@ -347,34 +479,226 @@ static void step(_NT_algorithm* self, float* busFrames, int numFramesBy4) {
 
         float* outputChunk = output + offset;
         if (outputMode == 1) {
-            memcpy(outputChunk, algo->temp_main_out, chunk * sizeof(float));
-        } else {
+            // Replace mode: copy with output level scaling
             for (int i = 0; i < chunk; ++i) {
-                outputChunk[i] += algo->temp_main_out[i];
+                outputChunk[i] = algo->temp_main_out[i] * algo->output_level_scale;
+            }
+        } else {
+            // Mix mode: add with output level scaling
+            for (int i = 0; i < chunk; ++i) {
+                outputChunk[i] += algo->temp_main_out[i] * algo->output_level_scale;
             }
         }
     }
+
+    // Restore original modulation value (don't let tuning offset accumulate)
+    algo->perf_state.modulation = original_modulation;
 }
 
-// Custom UI handler - used for button 4 diagnostic trigger
+// Custom UI handler - used for page navigation via button presses and pot/encoder routing
 static uint32_t hasCustomUi(_NT_algorithm* /*self*/) {
-    return kNT_button4;  // We handle button 4
+    // We handle buttons 1 and 2 for page navigation (prev/next)
+    // We also handle all pots and encoders for per-page parameter routing
+    return kNT_button1 | kNT_button2 | kNT_potL | kNT_potC | kNT_potR | kNT_encoderL | kNT_encoderR;
 }
 
 static void customUi(_NT_algorithm* self, const _NT_uiData& data) {
     nt_elementsAlgorithm* algo = static_cast<nt_elementsAlgorithm*>(self);
 
-    // Debounce button 4: only trigger on rising edge if state actually changed
+    // Get current and last button states
     uint16_t current_buttons = data.controls & 0xFFFF;
-    bool button4_now = current_buttons & kNT_button4;
-    bool button4_last = algo->last_button_state & kNT_button4;
+
+    // Detect button press events (rising edge detection)
+    bool button1_pressed = (current_buttons & kNT_button1) && !(algo->last_button_state & kNT_button1);
+    bool button2_pressed = (current_buttons & kNT_button2) && !(algo->last_button_state & kNT_button2);
+    bool button3_pressed = (current_buttons & kNT_button3) && !(algo->last_button_state & kNT_button3);
+    bool button4_pressed = (current_buttons & kNT_button4) && !(algo->last_button_state & kNT_button4);
 
     // Save current state for next call
     algo->last_button_state = current_buttons;
 
-    // Button 4 functionality can be added here if needed
-    (void)button4_now;  // Suppress unused warning for now
-    (void)button4_last;
+    // Button 1: Previous page (encoder 1 button)
+    if (button1_pressed) {
+        algo->current_page = (algo->current_page - 1 + kNumPages) % kNumPages;
+#ifdef NT_EMU_DEBUG
+        printf("Page navigation: Button 1 -> Page %d (%s)\n",
+               algo->current_page, PAGE_MAPPINGS[algo->current_page].name);
+#endif
+    }
+
+    // Button 2: Next page (encoder 2 button)
+    if (button2_pressed) {
+        algo->current_page = (algo->current_page + 1) % kNumPages;
+#ifdef NT_EMU_DEBUG
+        printf("Page navigation: Button 2 -> Page %d (%s)\n",
+               algo->current_page, PAGE_MAPPINGS[algo->current_page].name);
+#endif
+    }
+
+    // Buttons 3 and 4: Reserved for future use
+    (void)button3_pressed;
+    (void)button4_pressed;
+
+    // Get current page mapping
+    const PageMapping& page = PAGE_MAPPINGS[algo->current_page];
+
+    // Handle pot changes - pots provide absolute values (0.0-1.0)
+    // When we intercept pots/encoders via customUi, we bypass the NT parameter system
+    // and directly update the Elements Patch. This allows performance-oriented control
+    // where pots change function based on the current page.
+
+    elements::Patch* patch = algo->elements_part->mutable_patch();
+
+    // Check which pots changed using the controls bitmask
+    for (int i = 0; i < 3; ++i) {
+        uint16_t pot_mask = (i == 0) ? kNT_potL : (i == 1) ? kNT_potC : kNT_potR;
+        if (data.controls & pot_mask) {
+            // Pot changed - route to Elements Patch field based on current page
+            int param_index = page.pot_mapping[i];
+            float pot_value = data.pots[i];  // 0.0-1.0 from hardware
+
+            // Update Elements Patch directly based on parameter mapping
+            switch (param_index) {
+                // Page 1 - Exciter
+                case kParamBowLevel:
+                    patch->exciter_bow_level = pot_value;
+                    break;
+                case kParamBlowLevel:
+                    patch->exciter_blow_level = pot_value;
+                    break;
+                case kParamStrikeLevel:
+                    patch->exciter_strike_level = pot_value;
+                    break;
+
+                // Page 2 - Resonator
+                case kParamGeometry:
+                    patch->resonator_geometry = pot_value;
+                    break;
+                case kParamBrightness:
+                    patch->resonator_brightness = pot_value;
+                    break;
+                case kParamDamping:
+                    patch->resonator_damping = pot_value;
+                    break;
+
+                // Page 3 - Space
+                case kParamReverbAmount:
+                    patch->space = pot_value;
+                    break;
+                case kParamReverbSize:
+                    patch->reverb_lp = pot_value;
+                    break;
+                case kParamReverbDamping:
+                    patch->reverb_diffusion = pot_value;
+                    break;
+
+                // Page 4 - Performance
+                case kParamCoarseTune:
+                    // Convert 0.0-1.0 to -12 to +12 semitones
+                    algo->tuning_offset_semitones = (pot_value - 0.5f) * 24.0f;
+                    break;
+                case kParamFineTune:
+                    // Convert 0.0-1.0 to -50 to +50 cents
+                    algo->tuning_offset_semitones = (pot_value - 0.5f) * 1.0f;
+                    break;
+                case kParamOutputLevel:
+                    algo->output_level_scale = pot_value;
+                    break;
+
+                default:
+                    break;
+            }
+
+#ifdef NT_EMU_DEBUG
+            printf("Pot %d changed on page %s: param=%d value=%.2f\n",
+                   i, page.name, param_index, pot_value);
+#endif
+        }
+    }
+
+    // Handle encoder changes - encoders provide delta values (±1 or 0)
+    // For encoders, we need to track the current value and apply deltas
+    // We'll store encoder values in the algorithm structure
+    for (int i = 0; i < 2; ++i) {
+        int8_t delta = data.encoders[i];
+        if (delta != 0) {
+            // Encoder changed - route to Elements Patch field based on current page
+            int param_index = page.encoder_mapping[i];
+
+            // Check if encoder is mapped to a parameter (not reserved)
+            if (param_index < 0) {
+                continue;  // Encoder not assigned on this page
+            }
+
+            // Get current value from v[] (which is managed by framework for menu parameters)
+            // For performance controls, we need to maintain state
+            float step_size = 0.01f;  // 1% per detent
+            float current_value = 0.5f;  // Default center
+
+            // Try to get current value from v[] if available
+            const _NT_parameter& param = parameters[param_index];
+            current_value = (self->v[param_index] - param.min) / (param.max - param.min);
+
+            // Apply delta
+            float new_value = current_value + (delta * step_size);
+
+            // Clamp to 0.0-1.0 range
+            if (new_value < 0.0f) new_value = 0.0f;
+            if (new_value > 1.0f) new_value = 1.0f;
+
+            // Update Elements Patch directly based on parameter mapping
+            switch (param_index) {
+                // Page 1 - Exciter
+                case kParamBowTimbre:
+                    patch->exciter_bow_timbre = new_value;
+                    break;
+                case kParamBlowTimbre:
+                    patch->exciter_blow_timbre = new_value;
+                    break;
+
+                // Page 2 - Resonator
+                case kParamResonatorPosition:
+                    patch->resonator_position = new_value;
+                    break;
+                case kParamInharmonicity:
+                    patch->resonator_modulation_frequency = new_value;
+                    break;
+
+                // Page 4 - Performance
+                case kParamFMAmount:
+                    patch->modulation_frequency = new_value;
+                    break;
+                case kParamExciterContour:
+                    patch->exciter_envelope_shape = new_value;
+                    break;
+
+                default:
+                    break;
+            }
+
+#ifdef NT_EMU_DEBUG
+            printf("Encoder %d changed on page %s: param=%d delta=%d new_value=%.2f\n",
+                   i, page.name, param_index, delta, new_value);
+#endif
+        }
+    }
+}
+
+static void setupUi(_NT_algorithm* self, _NT_float3& pots) {
+    nt_elementsAlgorithm* algo = static_cast<nt_elementsAlgorithm*>(self);
+
+    // Get current page mapping
+    const PageMapping& page = PAGE_MAPPINGS[algo->current_page];
+
+    // Initialize pot positions from current parameter values
+    for (int i = 0; i < 3; ++i) {
+        int param_index = page.pot_mapping[i];
+        const _NT_parameter& param = parameters[param_index];
+
+        // Convert parameter value (0-100%) to pot position (0.0-1.0)
+        float param_value = self->v[param_index];
+        pots[i] = (param_value - param.min) / (param.max - param.min);
+    }
 }
 
 static void midiMessage(_NT_algorithm* self, uint8_t b0, uint8_t b1, uint8_t b2) {

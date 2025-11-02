@@ -50,7 +50,7 @@ development_status:
   1-11-sample-rate-mode-selection: done
   epic-1-retrospective: optional
   epic-2: backlog
-  2-1-complete-parameter-page-system: ready-for-dev
+  2-1-complete-parameter-page-system: done
   2-2-oled-display-implementation: ready-for-dev
   2-3-preset-save-load-integration: ready-for-dev
   2-4-factory-preset-library: ready-for-dev
