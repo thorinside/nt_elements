@@ -32,43 +32,8 @@
 
 #include "parameter_adapter.h"
 #include "parameter_pages.h"
-
-// Algorithm structure with Elements integration
-struct nt_elementsAlgorithm : public _NT_algorithm {
-    // Elements DSP engine (in DTC)
-    elements::Part* elements_part;
-
-    // Current performance state and patch
-    elements::PerformanceState perf_state;
-
-    // Temp buffers for Elements processing (in SRAM)
-    float* temp_blow_in;    // 512 floats
-    float* temp_strike_in;  // 512 floats
-    float* temp_main_out;   // 512 floats
-    float* temp_aux_out;    // 512 floats
-
-    // Memory region pointers for cleanup tracking
-    uint16_t* reverb_buffer;  // DRAM reverb buffer
-
-    // MIDI state for monophonic voice management
-    uint8_t current_note;     // Currently playing note (for last-note priority)
-
-    // Pending MIDI updates (written by midiMessage, read by step for thread safety)
-    volatile bool pending_update;
-    elements::PerformanceState pending_state;
-
-    // Button debouncing (track last button state to avoid bouncing)
-    uint16_t last_button_state;
-
-    // Page navigation state
-    int current_page;  // 0-3 for pages 1-4 (kPageExciter, kPageResonator, kPageSpace, kPagePerformance)
-
-    // Tuning state (derived from kParamCoarseTune and kParamFineTune)
-    float tuning_offset_semitones;  // Total tuning offset in semitones
-
-    // Output scaling (derived from kParamOutputLevel)
-    float output_level_scale;  // 0.0-1.0 output volume scaling
-};
+#include "nt_elements.h"
+#include "oled_display.h"
 
 // Factory functions forward declarations
 static void calculateStaticRequirements(_NT_staticRequirements& req);
@@ -77,6 +42,7 @@ static void calculateRequirements(_NT_algorithmRequirements& req, const int32_t*
 static _NT_algorithm* construct(const _NT_algorithmMemoryPtrs& ptrs, const _NT_algorithmRequirements& req, const int32_t* specifications);
 static void parameterChanged(_NT_algorithm* self, int p);
 static void step(_NT_algorithm* self, float* busFrames, int numFramesBy4);
+static bool draw(_NT_algorithm* self);
 static void midiMessage(_NT_algorithm* self, uint8_t b0, uint8_t b1, uint8_t b2);
 static uint32_t hasCustomUi(_NT_algorithm* self);
 static void customUi(_NT_algorithm* self, const _NT_uiData& data);
@@ -162,7 +128,7 @@ static const _NT_factory factory = {
     .construct = construct,
     .parameterChanged = parameterChanged,
     .step = step,
-    .draw = NULL,
+    .draw = draw,
     .midiRealtime = NULL,
     .midiMessage = midiMessage,
     .tags = kNT_tagInstrument,
@@ -261,6 +227,9 @@ static _NT_algorithm* construct(const _NT_algorithmMemoryPtrs& ptrs, const _NT_a
     // Initialize output level (default = 100% = full volume)
     self->output_level_scale = 1.0f;
 
+    // Initialize display state (start with dirty flag set to render initial display)
+    self->display_dirty = true;
+
     // Initialize default patch parameters (balanced modal sound)
     elements::Patch* patch = self->elements_part->mutable_patch();
 
@@ -298,6 +267,9 @@ static _NT_algorithm* construct(const _NT_algorithmMemoryPtrs& ptrs, const _NT_a
 static void parameterChanged(_NT_algorithm* self, int p) {
     nt_elementsAlgorithm* algo = static_cast<nt_elementsAlgorithm*>(self);
     elements::Patch* patch = algo->elements_part->mutable_patch();
+
+    // Mark display dirty for parameter changes
+    algo->display_dirty = true;
 
     // Convert NT parameters (0-100%) to Elements Patch fields (0.0-1.0)
     switch (p) {
@@ -495,6 +467,25 @@ static void step(_NT_algorithm* self, float* busFrames, int numFramesBy4) {
     algo->perf_state.modulation = original_modulation;
 }
 
+// Draw callback - render OLED display
+static bool draw(_NT_algorithm* self) {
+    nt_elementsAlgorithm* algo = static_cast<nt_elementsAlgorithm*>(self);
+
+    // Only redraw if display is dirty (parameter or page changed)
+    if (!algo->display_dirty) {
+        return false;  // Don't suppress standard parameter line
+    }
+
+    // Render the display
+    oled_display::renderDisplay(algo);
+
+    // Clear dirty flag
+    algo->display_dirty = false;
+
+    // Return false to not suppress the standard parameter line at top
+    return false;
+}
+
 // Custom UI handler - used for page navigation via button presses and pot/encoder routing
 static uint32_t hasCustomUi(_NT_algorithm* /*self*/) {
     // We handle buttons 1 and 2 for page navigation (prev/next)
@@ -520,6 +511,7 @@ static void customUi(_NT_algorithm* self, const _NT_uiData& data) {
     // Button 1: Previous page (encoder 1 button)
     if (button1_pressed) {
         algo->current_page = (algo->current_page - 1 + kNumPages) % kNumPages;
+        algo->display_dirty = true;  // Mark display dirty for page change
 #ifdef NT_EMU_DEBUG
         printf("Page navigation: Button 1 -> Page %d (%s)\n",
                algo->current_page, PAGE_MAPPINGS[algo->current_page].name);
@@ -529,6 +521,7 @@ static void customUi(_NT_algorithm* self, const _NT_uiData& data) {
     // Button 2: Next page (encoder 2 button)
     if (button2_pressed) {
         algo->current_page = (algo->current_page + 1) % kNumPages;
+        algo->display_dirty = true;  // Mark display dirty for page change
 #ifdef NT_EMU_DEBUG
         printf("Page navigation: Button 2 -> Page %d (%s)\n",
                algo->current_page, PAGE_MAPPINGS[algo->current_page].name);
@@ -556,6 +549,9 @@ static void customUi(_NT_algorithm* self, const _NT_uiData& data) {
             // Pot changed - route to Elements Patch field based on current page
             int param_index = page.pot_mapping[i];
             float pot_value = data.pots[i];  // 0.0-1.0 from hardware
+
+            // Mark display dirty for pot change
+            algo->display_dirty = true;
 
             // Update Elements Patch directly based on parameter mapping
             switch (param_index) {
@@ -629,6 +625,9 @@ static void customUi(_NT_algorithm* self, const _NT_uiData& data) {
             if (param_index < 0) {
                 continue;  // Encoder not assigned on this page
             }
+
+            // Mark display dirty for encoder change
+            algo->display_dirty = true;
 
             // Get current value from v[] (which is managed by framework for menu parameters)
             // For performance controls, we need to maintain state
