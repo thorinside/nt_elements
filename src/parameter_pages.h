@@ -30,17 +30,17 @@ enum PageIndex {
 // Page 1 - Exciter: Control how the resonator is excited (bowed, blown, struck)
 // Physical modeling synthesis begins with excitation
 namespace page_exciter {
-    // Pot mappings (3 pots)
+    // Pot mappings (3 pots) - using hardcoded indices to match parameters array
     const int POT_MAPPING[3] = {
-        kParamBowLevel,      // Pot 1: Bow Level (0-100%)
-        kParamBlowLevel,     // Pot 2: Blow Level (0-100%)
-        kParamStrikeLevel    // Pot 3: Strike Level (0-100%)
+        5,   // Bow Level (kParamBowLevel)
+        6,   // Blow Level (kParamBlowLevel)
+        7    // Strike Level (kParamStrikeLevel)
     };
 
     // Encoder mappings (2 encoders)
     const int ENCODER_MAPPING[2] = {
-        kParamBowTimbre,     // Encoder 1: Bow Timbre (0-100%)
-        kParamBlowTimbre     // Encoder 2: Blow Timbre (0-100%)
+        8,   // Bow Timbre (kParamBowTimbre)
+        9    // Blow Timbre (kParamBlowTimbre)
     };
 
     static const char* PAGE_NAME = "EXCITER";
@@ -49,17 +49,17 @@ namespace page_exciter {
 // Page 2 - Resonator: The core of Elements synthesis
 // Modal filters create the physical modeling character
 namespace page_resonator {
-    // Pot mappings (3 pots)
+    // Pot mappings (3 pots) - using hardcoded indices to match parameters array
     const int POT_MAPPING[3] = {
-        kParamGeometry,          // Pot 1: Geometry (material type: string/tube/etc)
-        kParamBrightness,        // Pot 2: Brightness (harmonic content/filter cutoff)
-        kParamDamping            // Pot 3: Damping (decay time/energy loss)
+        10,  // Geometry (kParamGeometry)
+        11,  // Brightness (kParamBrightness)
+        12   // Damping (kParamDamping)
     };
 
     // Encoder mappings (2 encoders)
     const int ENCODER_MAPPING[2] = {
-        kParamResonatorPosition, // Encoder 1: Position (strike/bow position on resonator)
-        kParamInharmonicity      // Encoder 2: Inharmonicity (metallic/bell-like character)
+        13,  // Position (kParamResonatorPosition)
+        14   // Inharmonicity (kParamInharmonicity)
     };
 
     static const char* PAGE_NAME = "RESONATOR";
@@ -68,17 +68,17 @@ namespace page_resonator {
 // Page 3 - Space: Reverb section adds spatial dimension
 // Creates ambience and room character
 namespace page_space {
-    // Pot mappings (3 pots)
+    // Pot mappings (3 pots) - using hardcoded indices to match parameters array
     const int POT_MAPPING[3] = {
-        kParamReverbAmount,      // Pot 1: Reverb Amount (wet/dry mix)
-        kParamReverbSize,        // Pot 2: Reverb Size (room size/reverb time)
-        kParamReverbDamping      // Pot 3: Reverb Damping (high-freq damping: bright vs dark)
+        15,  // Reverb Amount (kParamReverbAmount)
+        16,  // Reverb Size (kParamReverbSize)
+        17   // Reverb Damping (kParamReverbDamping)
     };
 
     // Encoder mappings (2 encoders) - reserved for future use
     const int ENCODER_MAPPING[2] = {
-        -1,  // Encoder 1: Reserved (could be bypass toggle)
-        -1   // Encoder 2: Reserved (could be reverb type selector)
+        -1,  // Encoder 1: Reserved
+        -1   // Encoder 2: Reserved
     };
 
     static const char* PAGE_NAME = "SPACE";
@@ -87,17 +87,17 @@ namespace page_space {
 // Page 4 - Performance: Global parameters affecting overall synthesis
 // Tuning, output, and modulation controls
 namespace page_performance {
-    // Pot mappings (3 pots)
+    // Pot mappings (3 pots) - using hardcoded indices to match parameters array
     const int POT_MAPPING[3] = {
-        kParamCoarseTune,    // Pot 1: Coarse Tune (-12 to +12 semitones)
-        kParamFineTune,      // Pot 2: Fine Tune (-50 to +50 cents)
-        kParamOutputLevel    // Pot 3: Output Level (0-100% volume)
+        18,  // Coarse Tune (kParamCoarseTune)
+        19,  // Fine Tune (kParamFineTune)
+        20   // Output Level (kParamOutputLevel)
     };
 
     // Encoder mappings (2 encoders)
     const int ENCODER_MAPPING[2] = {
-        kParamFMAmount,      // Encoder 1: FM Amount (frequency modulation depth)
-        kParamExciterContour // Encoder 2: Exciter Contour (envelope shape)
+        21,  // FM Amount (kParamFMAmount)
+        22   // Exciter Contour (kParamExciterContour)
     };
 
     static const char* PAGE_NAME = "PERF";

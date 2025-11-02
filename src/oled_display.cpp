@@ -18,6 +18,8 @@ const char* PARAM_NAMES[kNumParams] = {
     "Input",
     "Output",
     "Mode",
+    "AuxOut",
+    "AuxMode",
 
     // Page 1 - Exciter
     "Bow",
@@ -43,7 +45,15 @@ const char* PARAM_NAMES[kNumParams] = {
     "Fine",
     "Level",
     "FM Amt",
-    "Contour"
+    "Contour",
+
+    // Page 5 - Routing (continued)
+    "MIDI Ch",
+    "V/Oct",
+    "Gate",
+    "FM CV",
+    "Bright",
+    "Expr"
 };
 
 void clearDisplay() {
