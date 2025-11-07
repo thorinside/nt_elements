@@ -1,10 +1,10 @@
 MIT License
 
-nt_elements - Mutable Instruments Elements port for disting NT
-Copyright (c) 2025 Neal Sanche
+===============================================================================
+nt_elements - disting NT Port and Adapter Code
+===============================================================================
 
-Based on Mutable Instruments Elements
-Copyright (c) 2013-2014 Emilie Gillet
+Copyright (c) 2025 Neal Sanche
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -23,3 +23,45 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
+
+===============================================================================
+Mutable Instruments Elements - Original DSP Code
+===============================================================================
+
+The core DSP synthesis code in external/mutable-instruments/elements/ is:
+
+Copyright (c) 2014 Emilie Gillet
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+
+See http://creativecommons.org/licenses/MIT/ for more information.
+
+===============================================================================
+Summary
+===============================================================================
+
+This project (nt_elements) is a derivative work that combines:
+
+1. Adapter code for disting NT platform (src/*.cpp, src/*.h)
+   Copyright (c) 2025 Neal Sanche
+
+2. Original Mutable Instruments Elements DSP code (external/mutable-instruments/)
+   Copyright (c) 2014 Emilie Gillet
+
+Both components are licensed under the MIT License as stated above.

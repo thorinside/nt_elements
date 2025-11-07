@@ -171,8 +171,8 @@ Advanced Mapping: Any parameter can be CV-mapped via disting NT's parameter CV s
 
 nt_elements is a port of Mutable Instruments Elements modal synthesis engine to the Expert Sleepers disting NT platform.
 
-Original Elements DSP code: Copyright (c) 2013-2014 Emilie Gillet, Mutable Instruments
-Port to disting NT: Copyright (c) 2025 Neal Sanche
+Original Elements DSP code: Copyright (c) 2014 Emilie Gillet, Mutable Instruments
+disting NT adapter code: Copyright (c) 2025 Neal Sanche
 
 ## Building from Source
 
@@ -181,6 +181,12 @@ For developers wanting to build from source, see [DEVELOPMENT.md](DEVELOPMENT.md
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+The project combines:
+- Adapter code for disting NT (src/) - Copyright (c) 2025 Neal Sanche
+- Original Elements DSP code (external/mutable-instruments/) - Copyright (c) 2014 Emilie Gillet
+
+Both components are licensed under the MIT License.
 
 ## Support
 
