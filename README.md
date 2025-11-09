@@ -32,7 +32,7 @@ nt_elements brings the iconic Elements modal synthesis engine to the Expert Slee
 
 ## Installation
 
-1. Download `nt_elements.o` from the [releases page](https://github.com/yourusername/nt_elements/releases)
+1. Download `nt_elements.o` from the [releases page](https://github.com/thorinside/nt_elements/releases)
 2. Copy the file to your disting NT SD card (root directory or subdirectory)
 3. Insert SD card into disting NT
 4. Power on disting NT
