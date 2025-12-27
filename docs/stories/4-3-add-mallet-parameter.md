@@ -1,6 +1,6 @@
 # Story 4.3: Add Mallet Parameter (Strike Meta)
 
-Status: ready-for-dev
+Status: review
 
 ## Story
 
@@ -19,32 +19,30 @@ So that I can control the mallet/strike character of the strike exciter.
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Add parameter enum (AC: 1)
-  - [ ] Open `src/parameter_adapter.h`
-  - [ ] Add `kParamStrikeMallet` to ParameterIndices enum
-  - [ ] Position after existing exciter parameters
+- [x] Task 1: Add parameter enum (AC: 1)
+  - [x] Open `src/parameter_adapter.h`
+  - [x] Add `kParamStrikeMallet` to ParameterIndices enum
+  - [x] Position after kParamBlowFlow
 
-- [ ] Task 2: Define parameter in factory (AC: 1, 3, 6)
-  - [ ] Add parameter definition in factory `params()` callback
-  - [ ] Set range 0-100, default 50
-  - [ ] Set display name "Mallet"
+- [x] Task 2: Define parameter in factory (AC: 1, 3, 6)
+  - [x] Add parameter definition in parameters[] array
+  - [x] Set range 0-100, default 50
+  - [x] Set display name "Mallet"
 
-- [ ] Task 3: Map parameter to patch structure (AC: 2)
-  - [ ] In `parameterChanged()` callback, add case for `kParamStrikeMallet`
-  - [ ] Map to `patch.exciter_strike_meta = value / 100.0f`
+- [x] Task 3: Map parameter to patch structure (AC: 2)
+  - [x] In `parameterChanged()` callback, add case for `kParamStrikeMallet`
+  - [x] Map to `patch->exciter_strike_meta = ntToElements(value)`
 
-- [ ] Task 4: Add to parameter page (AC: 4)
-  - [ ] Open `src/parameter_pages.h`
-  - [ ] Add Mallet to Page 1 (Exciter) controls
-  - [ ] Assign to appropriate pot or encoder
+- [x] Task 4: Add to parameter page (AC: 4)
+  - [x] Add Mallet to pageExciter[] array
+  - [x] Now 7th parameter on Exciter page
 
-- [ ] Task 5: Update OLED display (AC: 5)
-  - [ ] Ensure "Mallet" label displays correctly
-  - [ ] Verify percentage formatting
+- [x] Task 5: Update OLED display (AC: 5)
+  - [x] "Mallet" label displays via parameter name
+  - [x] Percentage formatting via kNT_unitPercent
 
-- [ ] Task 6: Update default patch initialization (AC: 6)
-  - [ ] Locate `setDefaultPatch()` function
-  - [ ] Verify `exciter_strike_meta` is set to 0.5f (matching 50% default)
+- [x] Task 6: Update default patch initialization (AC: 6)
+  - [x] Verified `exciter_strike_meta` is already set to 0.5f in setDefaultPatch() (line 282)
 
 ## Dev Notes
 
@@ -82,6 +80,19 @@ So that I can control the mallet/strike character of the strike exciter.
 
 ### Debug Log References
 
+- Added kParamStrikeMallet enum to parameter_adapter.h after kParamBlowFlow
+- Added Mallet parameter definition to parameters[] array with range 0-100, default 50
+- Added kParamStrikeMallet to pageExciter[] for page organization
+- Added parameterChanged() case mapping to patch->exciter_strike_meta
+
 ### Completion Notes List
 
+- Mallet parameter now exposes exciter_strike_meta (the "MALLET" knob from original Elements)
+- Parameter is on Exciter page as 7th parameter
+- Default 50% matches existing setDefaultPatch() initialization
+- Build verified successful
+
 ### File List
+
+- src/parameter_adapter.h (added kParamStrikeMallet enum)
+- src/nt_elements.cpp (added parameter definition, page entry, parameterChanged case)

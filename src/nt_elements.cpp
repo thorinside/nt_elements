@@ -60,17 +60,23 @@ static void setupUi(_NT_algorithm* self, _NT_float3& pots);
 
 // Parameter definitions
 static const _NT_parameter parameters[kNumParams] = {
-    // System parameters
-    NT_PARAMETER_AUDIO_INPUT("Input", 1, 1)
+    // System parameters - Dual external inputs for Elements
+    // Blow Input: Audio goes through diffusion → envelope → STRENGTH VCA → resonator
+    // Strike Input: Audio goes directly to resonator (unprocessed)
+    NT_PARAMETER_AUDIO_INPUT("Blow Input", 1, 1)
+    NT_PARAMETER_AUDIO_INPUT("Strike Input", 0, 0)
     NT_PARAMETER_AUDIO_OUTPUT_WITH_MODE("Main Output", 1, 13)
     NT_PARAMETER_AUDIO_OUTPUT_WITH_MODE("Aux Output", 1, 14)
 
-    // Page 1 - Exciter (5 parameters)
+    // Page 1 - Exciter (8 parameters)
     { .name = "Bow Level", .min = 0, .max = 100, .def = 80, .unit = kNT_unitPercent, .scaling = 0, .enumStrings = NULL },
     { .name = "Blow Level", .min = 0, .max = 100, .def = 0, .unit = kNT_unitPercent, .scaling = 0, .enumStrings = NULL },
     { .name = "Strike Level", .min = 0, .max = 100, .def = 0, .unit = kNT_unitPercent, .scaling = 0, .enumStrings = NULL },
     { .name = "Bow Timbre", .min = 0, .max = 100, .def = 50, .unit = kNT_unitPercent, .scaling = 0, .enumStrings = NULL },
     { .name = "Blow Timbre", .min = 0, .max = 100, .def = 50, .unit = kNT_unitPercent, .scaling = 0, .enumStrings = NULL },
+    { .name = "Str Timbre", .min = 0, .max = 100, .def = 50, .unit = kNT_unitPercent, .scaling = 0, .enumStrings = NULL },
+    { .name = "Flow", .min = 0, .max = 100, .def = 50, .unit = kNT_unitPercent, .scaling = 0, .enumStrings = NULL },
+    { .name = "Mallet", .min = 0, .max = 100, .def = 50, .unit = kNT_unitPercent, .scaling = 0, .enumStrings = NULL },
 
     // Page 2 - Resonator (5 parameters)
     { .name = "Geometry", .min = 0, .max = 100, .def = 50, .unit = kNT_unitPercent, .scaling = 0, .enumStrings = NULL },
@@ -84,12 +90,13 @@ static const _NT_parameter parameters[kNumParams] = {
     { .name = "Reverb Size", .min = 0, .max = 100, .def = 50, .unit = kNT_unitPercent, .scaling = 0, .enumStrings = NULL },
     { .name = "Reverb Damp", .min = 0, .max = 100, .def = 70, .unit = kNT_unitPercent, .scaling = 0, .enumStrings = NULL },
 
-    // Page 4 - Performance (5 parameters)
+    // Page 4 - Performance (6 parameters)
     { .name = "Coarse Tune", .min = 0, .max = 100, .def = 50, .unit = kNT_unitPercent, .scaling = 0, .enumStrings = NULL },
     { .name = "Fine Tune", .min = 0, .max = 100, .def = 50, .unit = kNT_unitPercent, .scaling = 0, .enumStrings = NULL },
     { .name = "Output Lvl", .min = 0, .max = 100, .def = 100, .unit = kNT_unitPercent, .scaling = 0, .enumStrings = NULL },
     { .name = "FM Amount", .min = 0, .max = 100, .def = 0, .unit = kNT_unitPercent, .scaling = 0, .enumStrings = NULL },
     { .name = "Exciter Cnt", .min = 0, .max = 100, .def = 50, .unit = kNT_unitPercent, .scaling = 0, .enumStrings = NULL },
+    { .name = "Strength", .min = 0, .max = 100, .def = 80, .unit = kNT_unitPercent, .scaling = 0, .enumStrings = NULL },
 
     // Page 5 - Routing (MIDI Chan 0=Off, 1-16=specific channel + CV inputs)
     { .name = "MIDI Chan", .min = 0, .max = 16, .def = 1, .unit = kNT_unitNone, .scaling = 0, .enumStrings = NULL },
@@ -102,7 +109,7 @@ static const _NT_parameter parameters[kNumParams] = {
 
 // Parameter pages for menu organization
 static const uint8_t pageExciter[] = {
-    kParamBowLevel, kParamBlowLevel, kParamStrikeLevel, kParamBowTimbre, kParamBlowTimbre
+    kParamBowLevel, kParamBlowLevel, kParamStrikeLevel, kParamBowTimbre, kParamBlowTimbre, kParamStrikeTimbre, kParamBlowFlow, kParamStrikeMallet
 };
 
 static const uint8_t pageResonator[] = {
@@ -114,11 +121,11 @@ static const uint8_t pageSpace[] = {
 };
 
 static const uint8_t pagePerformance[] = {
-    kParamCoarseTune, kParamFineTune, kParamOutputLevel, kParamFMAmount, kParamExciterContour
+    kParamCoarseTune, kParamFineTune, kParamOutputLevel, kParamFMAmount, kParamExciterContour, kParamStrength
 };
 
 static const uint8_t pageRouting[] = {
-    kParamInputBus, kParamOutputBus, kParamOutputMode,
+    kParamBlowInputBus, kParamStrikeInputBus, kParamOutputBus, kParamOutputMode,
     kParamAuxOutputBus, kParamAuxOutputMode,
     kParamMidiChannel, kParamVOctCV, kParamGateCV,
     kParamFMCV, kParamBrightnessCV, kParamExpressionCV
@@ -234,11 +241,14 @@ static _NT_algorithm* construct(const _NT_algorithmMemoryPtrs& ptrs, const _NT_a
     // Initialize Elements Part with reverb buffer
     self->elements_part->Init(self->reverb_buffer);
 
+    // Initialize base strength (default = 80%) - must be before perf_state init
+    self->base_strength = 0.8f;
+
     // Initialize default performance state (gate ON by default to trigger bow exciter)
     self->perf_state.gate = true;   // Enable gate so bow exciter produces sound on startup
     self->perf_state.note = 69.0f;  // MIDI note number A4 (69)
     self->perf_state.modulation = 0.0f;  // Pitch bend offset in semitones
-    self->perf_state.strength = 0.8f;
+    self->perf_state.strength = self->base_strength;
 
     // Initialize MIDI state
     self->current_note = 0;
@@ -248,10 +258,13 @@ static _NT_algorithm* construct(const _NT_algorithmMemoryPtrs& ptrs, const _NT_a
     self->pending_state.gate = true;   // Match perf_state
     self->pending_state.note = 69.0f;
     self->pending_state.modulation = 0.0f;
-    self->pending_state.strength = 0.8f;
+    self->pending_state.strength = self->base_strength;
 
     // Initialize page navigation (start on Page 1 - Exciter)
     self->current_page = kPageExciter;
+    self->last_displayed_page = -1;  // Force page name display on first draw
+    self->page_change_frame = 0;
+    self->draw_frame_count = 0;
 
     // Initialize tuning offset (centered = no offset)
     self->tuning_offset_semitones = 0.0f;
@@ -263,7 +276,8 @@ static _NT_algorithm* construct(const _NT_algorithmMemoryPtrs& ptrs, const _NT_a
     self->gate_cv_was_high = false;
 
     // Initialize block size adaptation buffers
-    memset(self->input_buffer, 0, sizeof(self->input_buffer));
+    memset(self->blow_input_buffer, 0, sizeof(self->blow_input_buffer));
+    memset(self->strike_input_buffer, 0, sizeof(self->strike_input_buffer));
     memset(self->output_main, 0, sizeof(self->output_main));
     memset(self->output_aux, 0, sizeof(self->output_aux));
     self->buffer_pos = 0;
@@ -340,6 +354,18 @@ static void parameterChanged(_NT_algorithm* self, int p) {
             patch->exciter_blow_timbre = parameter_adapter::ntToElements(self->v[kParamBlowTimbre]);
             break;
 
+        case kParamStrikeTimbre:
+            patch->exciter_strike_timbre = parameter_adapter::ntToElements(self->v[kParamStrikeTimbre]);
+            break;
+
+        case kParamBlowFlow:
+            patch->exciter_blow_meta = parameter_adapter::ntToElements(self->v[kParamBlowFlow]);
+            break;
+
+        case kParamStrikeMallet:
+            patch->exciter_strike_meta = parameter_adapter::ntToElements(self->v[kParamStrikeMallet]);
+            break;
+
         // Page 2 - Resonator parameters
         case kParamGeometry:
             patch->resonator_geometry = parameter_adapter::ntToElements(self->v[kParamGeometry]);
@@ -402,8 +428,13 @@ static void parameterChanged(_NT_algorithm* self, int p) {
             patch->exciter_envelope_shape = parameter_adapter::ntToElements(self->v[kParamExciterContour]);
             break;
 
+        case kParamStrength:
+            algo->base_strength = parameter_adapter::ntToElements(self->v[kParamStrength]);
+            break;
+
         // Bus routing and CV input parameters don't need handling (used directly in step())
-        case kParamInputBus:
+        case kParamBlowInputBus:
+        case kParamStrikeInputBus:
         case kParamOutputBus:
         case kParamOutputMode:
         case kParamAuxOutputBus:
@@ -510,7 +541,7 @@ static void step(_NT_algorithm* self, float* busFrames, int numFramesBy4) {
             // Override performance state with CV values
             algo->perf_state.note = cv_note;
             algo->perf_state.gate = true;
-            algo->perf_state.strength = 0.8f;  // Fixed velocity for CV input
+            algo->perf_state.strength = algo->base_strength;  // Use parameter-defined strength for CV input
         }
         // If gate is LOW, fall through to use MIDI state (already applied above)
 
@@ -570,24 +601,30 @@ static void step(_NT_algorithm* self, float* busFrames, int numFramesBy4) {
 #endif
 
     // Get bus assignments (1-based, convert to 0-based for array access)
-    const int inputBus = static_cast<int>(self->v[kParamInputBus]) - 1;
+    // Dual external inputs: Blow input (processed) and Strike input (direct)
+    const int blowInputBus = static_cast<int>(self->v[kParamBlowInputBus]) - 1;
+    const int strikeInputBus = static_cast<int>(self->v[kParamStrikeInputBus]) - 1;
     const int outputBus = static_cast<int>(self->v[kParamOutputBus]) - 1;
     const int outputMode = static_cast<int>(self->v[kParamOutputMode]);
     const int auxOutputBus = static_cast<int>(self->v[kParamAuxOutputBus]) - 1;
     const int auxOutputMode = static_cast<int>(self->v[kParamAuxOutputMode]);
 
-    // Validate bus indices
-    if (inputBus < 0 || inputBus >= 28 || outputBus < 0 || outputBus >= 28 || auxOutputBus < 0 || auxOutputBus >= 28) {
+    // Validate output bus indices (input buses can be -1 meaning "not connected")
+    if (outputBus < 0 || outputBus >= 28 || auxOutputBus < 0 || auxOutputBus >= 28) {
         return;
     }
 
     // Get bus pointers (with null safety for reload scenarios)
-    const float* input = (busFrames && inputBus >= 0) ? busFrames + (inputBus * numFrames) : nullptr;
+    // Input buses: -1 means not connected (bus 0 in UI), returns nullptr
+    const float* blowInput = (busFrames && blowInputBus >= 0 && blowInputBus < 28)
+        ? busFrames + (blowInputBus * numFrames) : nullptr;
+    const float* strikeInput = (busFrames && strikeInputBus >= 0 && strikeInputBus < 28)
+        ? busFrames + (strikeInputBus * numFrames) : nullptr;
     float* output = (busFrames && outputBus >= 0) ? busFrames + (outputBus * numFrames) : nullptr;
     float* auxOutput = (busFrames && auxOutputBus >= 0) ? busFrames + (auxOutputBus * numFrames) : nullptr;
 
-    // Safety check: ensure all pointers are valid before processing
-    if (!input || !output || !auxOutput) {
+    // Safety check: ensure output pointers are valid before processing
+    if (!output || !auxOutput) {
         return;
     }
 
@@ -596,12 +633,16 @@ static void step(_NT_algorithm* self, float* busFrames, int numFramesBy4) {
     // The emulator guarantees outputs are read before processing, so single buffering works.
 
     for (int i = 0; i < numFrames; ++i) {
-        // Store input sample in accumulation buffer
-        algo->input_buffer[algo->buffer_pos] = input[i];
+        // Store input samples in accumulation buffers
+        // Blow input: Goes through diffusion → envelope → STRENGTH VCA → resonator
+        // Strike input: Goes directly to resonator (unprocessed)
+        algo->blow_input_buffer[algo->buffer_pos] = blowInput ? blowInput[i] : 0.0f;
+        algo->strike_input_buffer[algo->buffer_pos] = strikeInput ? strikeInput[i] : 0.0f;
 
         // Output from buffer (filled in previous processing cycle)
-        float main_out = algo->output_main[algo->buffer_pos] * algo->output_level_scale;
-        float aux_out = algo->output_aux[algo->buffer_pos] * algo->output_level_scale;
+        // Scale by 5.0f for Eurorack standard ±5V levels (Elements outputs normalized -1.0 to +1.0)
+        float main_out = algo->output_main[algo->buffer_pos] * algo->output_level_scale * 5.0f;
+        float aux_out = algo->output_aux[algo->buffer_pos] * algo->output_level_scale * 5.0f;
 
         if (outputMode == 1) {
             output[i] = main_out;  // Replace mode
@@ -622,9 +663,9 @@ static void step(_NT_algorithm* self, float* busFrames, int numFramesBy4) {
         if (algo->buffer_pos >= kElementsBlockSize) {
             algo->buffer_pos = 0;
 
-            // Copy accumulated input to Elements temp buffer
-            memcpy(algo->temp_blow_in, algo->input_buffer, kElementsBlockSize * sizeof(float));
-            memset(algo->temp_strike_in, 0, kElementsBlockSize * sizeof(float));
+            // Copy accumulated inputs to Elements temp buffers
+            memcpy(algo->temp_blow_in, algo->blow_input_buffer, kElementsBlockSize * sizeof(float));
+            memcpy(algo->temp_strike_in, algo->strike_input_buffer, kElementsBlockSize * sizeof(float));
 
             // Process full block through Elements DSP
             algo->elements_part->Process(

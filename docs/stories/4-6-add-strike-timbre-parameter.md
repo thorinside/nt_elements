@@ -1,6 +1,6 @@
 # Story 4.6: Add Strike Timbre Parameter
 
-Status: ready-for-dev
+Status: review
 
 ## Story
 
@@ -18,35 +18,35 @@ So that I can control the brightness/speed of the percussive excitation.
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Audit current Strike Timbre exposure (AC: 1)
-  - [ ] Search `src/parameter_adapter.h` for existing strike timbre param
-  - [ ] Check if `kParamStrikeTimbre` exists
-  - [ ] If not exposed, document the gap
+- [x] Task 1: Audit current Strike Timbre exposure (AC: 1)
+  - [x] Searched `src/parameter_adapter.h` - kParamStrikeTimbre did NOT exist
+  - [x] Only setDefaultPatch() set exciter_strike_timbre to 0.5f
+  - [x] Documented gap and proceeding to add it
 
-- [ ] Task 2: Add parameter enum if missing (AC: 1, 4)
-  - [ ] Add `kParamStrikeTimbre` to ParameterIndices enum
-  - [ ] Position with other timbre parameters
+- [x] Task 2: Add parameter enum if missing (AC: 1, 4)
+  - [x] Added `kParamStrikeTimbre` to ParameterIndices enum
+  - [x] Position after kParamBlowTimbre with other timbre parameters
 
-- [ ] Task 3: Define parameter in factory (AC: 4, 5)
-  - [ ] Add parameter definition in factory `params()` callback
-  - [ ] Set range 0-100, default 50
-  - [ ] Set display name "Strike Timbre"
+- [x] Task 3: Define parameter in factory (AC: 4, 5)
+  - [x] Added parameter definition in parameters[] array
+  - [x] Set range 0-100, default 50
+  - [x] Set display name "Str Timbre" (abbreviated for display)
 
-- [ ] Task 4: Map parameter to patch structure (AC: 1)
-  - [ ] In `parameterChanged()` callback, add case for `kParamStrikeTimbre`
-  - [ ] Map to `patch.exciter_strike_timbre = value / 100.0f`
+- [x] Task 4: Map parameter to patch structure (AC: 1)
+  - [x] Added case for `kParamStrikeTimbre` in `parameterChanged()`
+  - [x] Maps to `patch->exciter_strike_timbre = ntToElements(value)`
 
-- [ ] Task 5: Add to Timbre page (AC: 2)
-  - [ ] Open `src/parameter_pages.h`
-  - [ ] Add Strike Timbre to Page 2 (Timbre) - Pot 3
-  - [ ] Completes the timbre trio: Bow Timbre, Blow Timbre, Strike Timbre
+- [x] Task 5: Add to Timbre page (AC: 2)
+  - [x] Updated `src/parameter_pages.h`
+  - [x] Added Strike Timbre to Page 2 (Timbre) - Pot 3
+  - [x] Completes timbre trio: Bow Timbre, Blow Timbre, Strike Timbre
 
-- [ ] Task 6: Update OLED display (AC: 3)
-  - [ ] Add label "StrTim" or "StrikeTim" for display
-  - [ ] Verify percentage formatting
+- [x] Task 6: Update OLED display (AC: 3)
+  - [x] "Str Timbre" label displays via parameter name
+  - [x] Percentage formatting via kNT_unitPercent
 
-- [ ] Task 7: Verify default initialization (AC: 5)
-  - [ ] Confirm `exciter_strike_timbre` is set to 0.5f in defaults
+- [x] Task 7: Verify default initialization (AC: 5)
+  - [x] Confirmed `exciter_strike_timbre` is set to 0.5f in setDefaultPatch() (line 289)
 
 ## Dev Notes
 
@@ -83,6 +83,22 @@ So that I can control the brightness/speed of the percussive excitation.
 
 ### Debug Log References
 
+- Added kParamStrikeTimbre enum to parameter_adapter.h after kParamBlowTimbre
+- Added "Str Timbre" parameter definition to parameters[] array
+- Added pageExciter entry for kParamStrikeTimbre
+- Added parameterChanged() case mapping to patch->exciter_strike_timbre
+- Updated page_timbre POT_MAPPING to use kParamStrikeTimbre
+
 ### Completion Notes List
 
+- Strike Timbre now exposed as controllable parameter
+- Completes the trio: Bow Timbre, Blow Timbre, Strike Timbre
+- On Page 2 (Timbre) as Pot 3
+- Default 50% matches existing setDefaultPatch() value
+- Build verified successful
+
 ### File List
+
+- src/parameter_adapter.h (added kParamStrikeTimbre enum)
+- src/nt_elements.cpp (added parameter definition, pageExciter entry, parameterChanged case)
+- src/parameter_pages.h (updated page_timbre POT_MAPPING)

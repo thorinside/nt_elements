@@ -46,9 +46,10 @@ const int BG_COLOR = 0;
 
 /**
  * Render the current page title at the top of the display
- * @param current_page Page index (0-3)
+ * Shows page name for 5 seconds after page change, then fades to "Elements"
+ * @param algo Algorithm instance containing page state and timing
  */
-void renderPageTitle(int current_page);
+void renderPageTitle(nt_elementsAlgorithm* algo);
 
 /**
  * Render parameter names and values for the current page

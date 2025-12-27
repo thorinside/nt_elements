@@ -1,6 +1,6 @@
 # Story 4.2: Add Flow Parameter (Blow Meta)
 
-Status: ready-for-dev
+Status: review
 
 ## Story
 
@@ -19,32 +19,30 @@ So that I can control the air flow character of the blow exciter.
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Add parameter enum (AC: 1)
-  - [ ] Open `src/parameter_adapter.h` (or equivalent parameter definitions)
-  - [ ] Add `kParamBlowFlow` to ParameterIndices enum
-  - [ ] Position after existing exciter parameters
+- [x] Task 1: Add parameter enum (AC: 1)
+  - [x] Open `src/parameter_adapter.h`
+  - [x] Add `kParamBlowFlow` to ParameterIndices enum
+  - [x] Position after existing exciter parameters (after kParamBlowTimbre)
 
-- [ ] Task 2: Define parameter in factory (AC: 1, 3, 6)
-  - [ ] Add parameter definition in factory `params()` callback
-  - [ ] Set range 0-100, default 50
-  - [ ] Set display name "Flow"
+- [x] Task 2: Define parameter in factory (AC: 1, 3, 6)
+  - [x] Add parameter definition in parameters[] array
+  - [x] Set range 0-100, default 50
+  - [x] Set display name "Flow"
 
-- [ ] Task 3: Map parameter to patch structure (AC: 2)
-  - [ ] In `parameterChanged()` callback, add case for `kParamBlowFlow`
-  - [ ] Map to `patch.exciter_blow_meta = value / 100.0f`
+- [x] Task 3: Map parameter to patch structure (AC: 2)
+  - [x] In `parameterChanged()` callback, add case for `kParamBlowFlow`
+  - [x] Map to `patch->exciter_blow_meta = ntToElements(value)`
 
-- [ ] Task 4: Add to parameter page (AC: 4)
-  - [ ] Open `src/parameter_pages.h`
-  - [ ] Add Flow to Page 1 (Exciter) controls
-  - [ ] Assign to appropriate pot or encoder
+- [x] Task 4: Add to parameter page (AC: 4)
+  - [x] Add Flow to pageExciter[] array
+  - [x] Now 6th parameter on Exciter page
 
-- [ ] Task 5: Update OLED display (AC: 5)
-  - [ ] Ensure "Flow" label displays correctly
-  - [ ] Verify percentage formatting
+- [x] Task 5: Update OLED display (AC: 5)
+  - [x] "Flow" label displays via parameter name
+  - [x] Percentage formatting via kNT_unitPercent
 
-- [ ] Task 6: Update default patch initialization (AC: 6)
-  - [ ] Locate `setDefaultPatch()` function
-  - [ ] Verify `exciter_blow_meta` is set to 0.5f (matching 50% default)
+- [x] Task 6: Update default patch initialization (AC: 6)
+  - [x] Verified `exciter_blow_meta` is already set to 0.5f in setDefaultPatch() (line 279)
 
 ## Dev Notes
 
@@ -78,6 +76,19 @@ So that I can control the air flow character of the blow exciter.
 
 ### Debug Log References
 
+- Added kParamBlowFlow enum to parameter_adapter.h after kParamBlowTimbre
+- Added Flow parameter definition to parameters[] array with range 0-100, default 50
+- Added kParamBlowFlow to pageExciter[] for page organization
+- Added parameterChanged() case mapping to patch->exciter_blow_meta
+
 ### Completion Notes List
 
+- Flow parameter now exposes exciter_blow_meta (the "FLOW" knob from original Elements)
+- Parameter is on Exciter page as 6th parameter
+- Default 50% matches existing setDefaultPatch() initialization
+- Build verified successful
+
 ### File List
+
+- src/parameter_adapter.h (added kParamBlowFlow enum)
+- src/nt_elements.cpp (added parameter definition, page entry, parameterChanged case)

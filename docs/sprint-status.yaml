@@ -66,13 +66,13 @@ development_status:
   3-5-integration-and-validation: done
   epic-3-retrospective: optional
   epic-4: backlog
-  4-1-audio-output-level-scaling: ready-for-dev
-  4-2-add-flow-parameter: ready-for-dev
-  4-3-add-mallet-parameter: ready-for-dev
-  4-4-add-strength-parameter: ready-for-dev
-  4-5-reorganize-parameter-pages: ready-for-dev
-  4-6-add-strike-timbre-parameter: ready-for-dev
+  4-1-audio-output-level-scaling: review
+  4-2-add-flow-parameter: review
+  4-3-add-mallet-parameter: review
+  4-4-add-strength-parameter: review
+  4-5-reorganize-parameter-pages: review
+  4-6-add-strike-timbre-parameter: review
   4-7-validation-and-ab-testing: ready-for-dev
-  4-8-dual-external-input-routing: ready-for-dev
-  4-9-add-emilie-gillet-attribution: ready-for-dev
+  4-8-dual-external-input-routing: review
+  4-9-add-emilie-gillet-attribution: review
   epic-4-retrospective: optional

@@ -17,39 +17,44 @@
 // These map to the parameters array in the NT_algorithm structure
 enum ParameterIndices {
     // System parameters (routing)
-    kParamInputBus = 0,
+    kParamBlowInputBus = 0,   // External audio input for blow path (diffused → VCA)
+    kParamStrikeInputBus,     // External audio input for strike path (direct to resonator)
     kParamOutputBus,
     kParamOutputMode,
     kParamAuxOutputBus,
     kParamAuxOutputMode,
 
-    // Page 1 - Exciter (5 parameters)
+    // Exciter parameters (used on multiple pages)
     kParamBowLevel,          // Bow exciter level (0-100% → 0.0-1.0)
     kParamBlowLevel,         // Blow exciter level (0-100% → 0.0-1.0)
     kParamStrikeLevel,       // Strike exciter level (0-100% → 0.0-1.0)
     kParamBowTimbre,         // Bow timbre color (0-100% → 0.0-1.0)
     kParamBlowTimbre,        // Blow timbre color (0-100% → 0.0-1.0)
+    kParamStrikeTimbre,      // Strike timbre brightness (0-100% → 0.0-1.0)
+    kParamBlowFlow,          // Blow meta/flow (0-100% → 0.0-1.0)
+    kParamStrikeMallet,      // Strike meta/mallet (0-100% → 0.0-1.0)
 
-    // Page 2 - Resonator (5 parameters)
+    // Resonator parameters
     kParamGeometry,          // Resonator geometry/material (0-100% → 0.0-1.0)
     kParamBrightness,        // Resonator brightness/cutoff (0-100% → 0.0-1.0)
     kParamDamping,           // Resonator damping/decay (0-100% → 0.0-1.0)
     kParamResonatorPosition, // Strike position (0-100% → 0.0-1.0)
     kParamInharmonicity,     // Inharmonicity/modulation (0-100% → 0.0-1.0)
 
-    // Page 3 - Space (3 parameters)
+    // Reverb/Space parameters
     kParamReverbAmount,      // Reverb wet/dry mix (0-100% → 0.0-1.0)
     kParamReverbSize,        // Reverb room size/time (0-100% → 0.0-1.0)
     kParamReverbDamping,     // Reverb high-freq damping (0-100% → 0.0-1.0)
 
-    // Page 4 - Performance (5 parameters)
+    // Performance/Tuning parameters
     kParamCoarseTune,        // Coarse tuning (-12 to +12 semitones, 0-100% scale)
     kParamFineTune,          // Fine tuning (-50 to +50 cents, 0-100% scale)
     kParamOutputLevel,       // Output volume (0-100% → 0.0-1.0)
     kParamFMAmount,          // FM modulation amount (0-100% → 0.0-1.0)
     kParamExciterContour,    // Exciter envelope shape (0-100% → 0.0-1.0)
+    kParamStrength,          // Excitation strength (0-100% → 0.0-1.0)
 
-    // Page 5 - Routing (MIDI + CV inputs)
+    // Routing parameters (MIDI + CV inputs)
     kParamMidiChannel,       // MIDI channel filter (0=Off/disabled, 1-16=specific channel)
     kParamVOctCV,            // V/OCT CV input bus (0=none, 1-28=bus number)
     kParamGateCV,            // Gate CV input bus (0=none, 1-28=bus number)

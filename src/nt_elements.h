@@ -34,7 +34,9 @@ struct nt_elementsAlgorithm : public _NT_algorithm {
 
     // Block size adaptation buffers (VCV uses 4-sample blocks, Elements needs 16)
     // We accumulate input until we have 16 samples, then process through Elements.
-    float input_buffer[kElementsBlockSize];
+    // Dual input buffers for blow (processed) and strike (direct) paths
+    float blow_input_buffer[kElementsBlockSize];
+    float strike_input_buffer[kElementsBlockSize];
     float output_main[kElementsBlockSize];
     float output_aux[kElementsBlockSize];
     int buffer_pos;  // Current position in buffers (0-15)
@@ -57,12 +59,18 @@ struct nt_elementsAlgorithm : public _NT_algorithm {
 
     // Page navigation state
     int current_page;
+    int last_displayed_page;      // For detecting page changes
+    uint32_t page_change_frame;   // Frame count when page changed
+    uint32_t draw_frame_count;    // Incremented each draw() call (~60Hz)
 
     // Tuning state
     float tuning_offset_semitones;
 
     // Output scaling
     float output_level_scale;
+
+    // Excitation strength (base value, can be modulated by MIDI velocity)
+    float base_strength;
 
     // CV input state
     bool gate_cv_was_high;  // For gate edge detection

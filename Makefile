@@ -71,7 +71,9 @@ else
     DYLIB_EXT = so
 endif
 
-CXXFLAGS_TEST = $(CXXFLAGS_COMMON) $(DEFINES_TEST) -O2 -fPIC
+# Suppress warnings from external Mutable Instruments code (unused params, typedefs)
+CXXFLAGS_TEST = $(CXXFLAGS_COMMON) $(DEFINES_TEST) -O2 -fPIC \
+	-Wno-unused-parameter -Wno-unused-local-typedefs
 
 # Output directories
 PLUGINS_DIR = plugins

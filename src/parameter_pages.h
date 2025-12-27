@@ -2,12 +2,13 @@
  * parameter_pages.h - Parameter page organization for nt_elements
  *
  * Defines 4-page structure for organizing nt_elements parameters:
- * - Page 1 (Exciter): Bow/Blow/Strike excitation controls
- * - Page 2 (Resonator): Resonator material and character controls
- * - Page 3 (Space): Reverb and ambience controls
- * - Page 4 (Performance): Global tuning, FM, and output controls
+ * - Page 1 (Exciter): Excitation level and strength controls
+ * - Page 2 (Timbre): Timbre/color controls for each exciter type
+ * - Page 3 (Resonator): Resonator material and spatial controls
+ * - Page 4 (Tuning): Global tuning, FM, and output controls
  *
  * Each page maps NT hardware controls (3 pots + 2 encoders) to specific parameters.
+ * Layout mirrors the original Elements hardware panel organization.
  *
  * Copyright (c) 2025
  * Licensed under MIT License
@@ -21,86 +22,106 @@
 // Page enumeration
 enum PageIndex {
     kPageExciter = 0,
-    kPageResonator = 1,
-    kPageSpace = 2,
-    kPagePerformance = 3,
+    kPageTimbre = 1,
+    kPageResonator = 2,
+    kPageTuning = 3,
     kNumPages = 4
 };
 
 // Page 1 - Exciter: Control how the resonator is excited (bowed, blown, struck)
 // Physical modeling synthesis begins with excitation
 namespace page_exciter {
-    // Pot mappings (3 pots) - using hardcoded indices to match parameters array
+    // Pot mappings (3 pots) - main exciter levels
+    // Pot 1: Bow (bow exciter level)
+    // Pot 2: Blow (blow exciter level)
+    // Pot 3: Strike (strike exciter level)
     const int POT_MAPPING[3] = {
-        5,   // Bow Level (kParamBowLevel)
-        6,   // Blow Level (kParamBlowLevel)
-        7    // Strike Level (kParamStrikeLevel)
+        kParamBowLevel,        // Bow Level
+        kParamBlowLevel,       // Blow Level
+        kParamStrikeLevel      // Strike Level
     };
 
     // Encoder mappings (2 encoders)
+    // Encoder 1 (L): Strength (excitation intensity)
+    // Encoder 2 (R): Contour (envelope shape for bow/blow)
     const int ENCODER_MAPPING[2] = {
-        8,   // Bow Timbre (kParamBowTimbre)
-        9    // Blow Timbre (kParamBlowTimbre)
+        kParamStrength,        // Strength
+        kParamExciterContour   // Contour
     };
 
     static const char* PAGE_NAME = "EXCITER";
 }
 
-// Page 2 - Resonator: The core of Elements synthesis
-// Modal filters create the physical modeling character
-namespace page_resonator {
-    // Pot mappings (3 pots) - using hardcoded indices to match parameters array
+// Page 2 - Timbre: Tonal character of each exciter type
+// Shapes the frequency content and texture of excitation signals
+namespace page_timbre {
+    // Pot mappings (3 pots)
+    // Pot 1: Bow Timbre (bow smoothness/granularity)
+    // Pot 2: Blow Timbre (blow pitch/granulation rate)
+    // Pot 3: Strike Timbre (strike brightness/speed)
     const int POT_MAPPING[3] = {
-        10,  // Geometry (kParamGeometry)
-        11,  // Brightness (kParamBrightness)
-        12   // Damping (kParamDamping)
+        kParamBowTimbre,       // Bow Timbre
+        kParamBlowTimbre,      // Blow Timbre
+        kParamStrikeTimbre     // Strike Timbre
     };
 
     // Encoder mappings (2 encoders)
+    // Encoder 1: Flow (blow meta - air flow character)
+    // Encoder 2: Mallet (strike meta - mallet type)
     const int ENCODER_MAPPING[2] = {
-        13,  // Position (kParamResonatorPosition)
-        14   // Inharmonicity (kParamInharmonicity)
+        kParamBlowFlow,        // Flow (blow meta)
+        kParamStrikeMallet     // Mallet (strike meta)
+    };
+
+    static const char* PAGE_NAME = "TIMBRE";
+}
+
+// Page 3 - Resonator: The core of Elements synthesis
+// Modal filters create the physical modeling character
+namespace page_resonator {
+    // Pot mappings (3 pots)
+    // Pot 1: Geometry (structure shape)
+    // Pot 2: Brightness (high frequency damping)
+    // Pot 3: Damping (energy dissipation)
+    const int POT_MAPPING[3] = {
+        kParamGeometry,        // Geometry
+        kParamBrightness,      // Brightness
+        kParamDamping          // Damping
+    };
+
+    // Encoder mappings (2 encoders)
+    // Encoder 1: Position (excitation point)
+    // Encoder 2: Space (stereo width + reverb)
+    const int ENCODER_MAPPING[2] = {
+        kParamResonatorPosition,  // Position
+        kParamReverbAmount        // Space (reverb amount)
     };
 
     static const char* PAGE_NAME = "RESONATOR";
 }
 
-// Page 3 - Space: Reverb section adds spatial dimension
-// Creates ambience and room character
-namespace page_space {
-    // Pot mappings (3 pots) - using hardcoded indices to match parameters array
-    const int POT_MAPPING[3] = {
-        15,  // Reverb Amount (kParamReverbAmount)
-        16,  // Reverb Size (kParamReverbSize)
-        17   // Reverb Damping (kParamReverbDamping)
-    };
-
-    // Encoder mappings (2 encoders) - reserved for future use
-    const int ENCODER_MAPPING[2] = {
-        -1,  // Encoder 1: Reserved
-        -1   // Encoder 2: Reserved
-    };
-
-    static const char* PAGE_NAME = "SPACE";
-}
-
-// Page 4 - Performance: Global parameters affecting overall synthesis
+// Page 4 - Tuning: Global parameters affecting overall synthesis
 // Tuning, output, and modulation controls
-namespace page_performance {
-    // Pot mappings (3 pots) - using hardcoded indices to match parameters array
+namespace page_tuning {
+    // Pot mappings (3 pots)
+    // Pot 1: Coarse (semitone tuning)
+    // Pot 2: Fine (cent tuning)
+    // Pot 3: FM Amount (frequency modulation depth)
     const int POT_MAPPING[3] = {
-        18,  // Coarse Tune (kParamCoarseTune)
-        19,  // Fine Tune (kParamFineTune)
-        20   // Output Level (kParamOutputLevel)
+        kParamCoarseTune,      // Coarse Tune
+        kParamFineTune,        // Fine Tune
+        kParamFMAmount         // FM Amount
     };
 
     // Encoder mappings (2 encoders)
+    // Encoder 1: Output Level (master volume)
+    // Encoder 2: Reverb Size (additional reverb control)
     const int ENCODER_MAPPING[2] = {
-        21,  // FM Amount (kParamFMAmount)
-        22   // Exciter Contour (kParamExciterContour)
+        kParamOutputLevel,     // Output Level
+        kParamReverbSize       // Reverb Size
     };
 
-    static const char* PAGE_NAME = "PERF";
+    static const char* PAGE_NAME = "TUNING";
 }
 
 // Unified page access structure for generic page navigation
@@ -113,9 +134,9 @@ struct PageMapping {
 // Page mapping table indexed by PageIndex (static to avoid duplicate symbols)
 static const PageMapping PAGE_MAPPINGS[kNumPages] = {
     { page_exciter::POT_MAPPING, page_exciter::ENCODER_MAPPING, page_exciter::PAGE_NAME },
+    { page_timbre::POT_MAPPING, page_timbre::ENCODER_MAPPING, page_timbre::PAGE_NAME },
     { page_resonator::POT_MAPPING, page_resonator::ENCODER_MAPPING, page_resonator::PAGE_NAME },
-    { page_space::POT_MAPPING, page_space::ENCODER_MAPPING, page_space::PAGE_NAME },
-    { page_performance::POT_MAPPING, page_performance::ENCODER_MAPPING, page_performance::PAGE_NAME }
+    { page_tuning::POT_MAPPING, page_tuning::ENCODER_MAPPING, page_tuning::PAGE_NAME }
 };
 
 #endif // NT_ELEMENTS_PARAMETER_PAGES_H_

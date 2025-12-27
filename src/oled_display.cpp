@@ -12,65 +12,121 @@
 
 namespace oled_display {
 
+// Attribution for original Elements creator
+const char* ATTRIBUTION_TEXT = "By Emilie Gillet";
+
 // Parameter name abbreviations for display (max ~12 chars to fit)
 const char* PARAM_NAMES[kNumParams] = {
-    // System parameters
-    "Input",
-    "Output",
-    "Mode",
-    "AuxOut",
-    "AuxMode",
+    // System parameters (routing)
+    "BlowIn",     // kParamBlowInputBus
+    "StrikeIn",   // kParamStrikeInputBus
+    "Output",     // kParamOutputBus
+    "Mode",       // kParamOutputMode
+    "AuxOut",     // kParamAuxOutputBus
+    "AuxMode",    // kParamAuxOutputMode
 
-    // Page 1 - Exciter
-    "Bow",
-    "Blow",
-    "Strike",
-    "BowTim",
-    "BlowTim",
+    // Exciter parameters
+    "Bow",        // kParamBowLevel
+    "Blow",       // kParamBlowLevel
+    "Strike",     // kParamStrikeLevel
+    "BowTim",     // kParamBowTimbre
+    "BlowTim",    // kParamBlowTimbre
+    "StrTim",     // kParamStrikeTimbre
+    "Flow",       // kParamBlowFlow
+    "Mallet",     // kParamStrikeMallet
 
-    // Page 2 - Resonator
-    "Geom",
-    "Bright",
-    "Damp",
-    "Pos",
-    "Inharm",
+    // Resonator parameters
+    "Geom",       // kParamGeometry
+    "Bright",     // kParamBrightness
+    "Damp",       // kParamDamping
+    "Pos",        // kParamResonatorPosition
+    "Inharm",     // kParamInharmonicity
 
-    // Page 3 - Space
-    "Reverb",
-    "Size",
-    "RvDamp",
+    // Reverb/Space parameters
+    "Reverb",     // kParamReverbAmount
+    "Size",       // kParamReverbSize
+    "RvDamp",     // kParamReverbDamping
 
-    // Page 4 - Performance
-    "Coarse",
-    "Fine",
-    "Level",
-    "FM Amt",
-    "Contour",
+    // Performance/Tuning parameters
+    "Coarse",     // kParamCoarseTune
+    "Fine",       // kParamFineTune
+    "Level",      // kParamOutputLevel
+    "FM Amt",     // kParamFMAmount
+    "Contour",    // kParamExciterContour
+    "Strength",   // kParamStrength
 
-    // Page 5 - Routing (continued)
-    "MIDI Ch",
-    "V/Oct",
-    "Gate",
-    "FM CV",
-    "Bright",
-    "Expr"
+    // Routing parameters (MIDI + CV)
+    "MIDI Ch",    // kParamMidiChannel
+    "V/Oct",      // kParamVOctCV
+    "Gate",       // kParamGateCV
+    "FM CV",      // kParamFMCV
+    "BrightCV",   // kParamBrightnessCV
+    "Expr"        // kParamExpressionCV
 };
 
-void renderPageTitle(int current_page) {
+// Page title display timing constants (assuming ~60 FPS draw rate)
+const uint32_t PAGE_NAME_DISPLAY_FRAMES = 300;  // Show page name for ~5 seconds (300 frames @ 60Hz)
+const uint32_t FADE_DURATION_FRAMES = 30;       // Fade transition ~500ms (30 frames @ 60Hz)
+
+void renderPageTitle(nt_elementsAlgorithm* algo) {
+    if (!algo) return;
+
+    int current_page = algo->current_page;
+
     // Get page name from page mappings
     if (current_page < 0 || current_page >= kNumPages) {
         return;  // Invalid page index
     }
 
     const PageMapping& page = PAGE_MAPPINGS[current_page];
+    if (!page.name) return;
 
-    // Safety check for null pointer
-    if (!page.name) {
-        return;
+    // Increment frame counter
+    algo->draw_frame_count++;
+
+    // Detect page change
+    if (current_page != algo->last_displayed_page) {
+        algo->last_displayed_page = current_page;
+        algo->page_change_frame = algo->draw_frame_count;
     }
 
-    // Draw page title centered at top with large font
-    NT_drawText(SCREEN_WIDTH / 2, PAGE_TITLE_Y, page.name, TEXT_COLOR, kNT_textCentre, TITLE_FONT);
+    // Calculate frames since page change
+    uint32_t elapsed_frames = algo->draw_frame_count - algo->page_change_frame;
+
+    // Determine what to display and at what brightness
+    const char* title_text;
+    int brightness;
+
+    if (elapsed_frames < PAGE_NAME_DISPLAY_FRAMES) {
+        // Show page name at full brightness
+        title_text = page.name;
+        brightness = TEXT_COLOR;
+    } else if (elapsed_frames < PAGE_NAME_DISPLAY_FRAMES + FADE_DURATION_FRAMES) {
+        // Fade from page name to "Elements"
+        uint32_t fade_progress = elapsed_frames - PAGE_NAME_DISPLAY_FRAMES;
+        float fade_ratio = static_cast<float>(fade_progress) / FADE_DURATION_FRAMES;
+
+        // Cross-fade: page name fades out, "Elements" fades in
+        int page_brightness = static_cast<int>((1.0f - fade_ratio) * TEXT_COLOR);
+        int elements_brightness = static_cast<int>(fade_ratio * TEXT_COLOR);
+
+        // Draw page name fading out
+        if (page_brightness > 0) {
+            NT_drawText(SCREEN_WIDTH / 2, PAGE_TITLE_Y, page.name, page_brightness, kNT_textCentre, TITLE_FONT);
+        }
+        // Draw "Elements" fading in
+        if (elements_brightness > 0) {
+            NT_drawText(SCREEN_WIDTH / 2, PAGE_TITLE_Y, "Elements", elements_brightness, kNT_textCentre, TITLE_FONT);
+        }
+        return;
+    } else {
+        // Show "Elements" at full brightness
+        title_text = "Elements";
+        brightness = TEXT_COLOR;
+    }
+
+    // Draw title at calculated brightness
+    NT_drawText(SCREEN_WIDTH / 2, PAGE_TITLE_Y, title_text, brightness, kNT_textCentre, TITLE_FONT);
 }
 
 const char* getParamName(int param_index) {
@@ -245,7 +301,7 @@ void renderParameters(nt_elementsAlgorithm* algo) {
 }
 
 void renderSampleWarning(nt_elementsAlgorithm* algo) {
-    const int WARNING_Y = SCREEN_HEIGHT - 8;  // Bottom of screen
+    const int BOTTOM_Y = SCREEN_HEIGHT - 8;  // Bottom of screen
 
     // Check if samples are loaded using the sample manager
     if (!algo->sample_manager.isLoaded()) {
@@ -268,20 +324,11 @@ void renderSampleWarning(nt_elementsAlgorithm* algo) {
                 break;
         }
 
-        NT_drawText(SCREEN_WIDTH / 2, WARNING_Y, message, TEXT_COLOR, kNT_textCentre, kNT_textTiny);
+        NT_drawText(SCREEN_WIDTH / 2, BOTTOM_Y, message, TEXT_COLOR, kNT_textCentre, kNT_textTiny);
+    } else {
+        // Show attribution for original Elements creator at bottom of screen
+        NT_drawText(SCREEN_WIDTH / 2, BOTTOM_Y, ATTRIBUTION_TEXT, TEXT_COLOR, kNT_textCentre, kNT_textTiny);
     }
-#ifdef NT_EMU_DEBUG
-    else {
-        // Debug: Show sample rate and first sample value
-        // Expected: S0:-964, SR:48000 (or VCV's actual rate)
-        const int16_t* samples = algo->sample_manager.getSampleData();
-        char debug_buf[32];
-        snprintf(debug_buf, sizeof(debug_buf), "S0:%d SR:%u",
-                 static_cast<int>(samples[0]),
-                 static_cast<unsigned>(NT_globals.sampleRate));
-        NT_drawText(SCREEN_WIDTH / 2, WARNING_Y, debug_buf, TEXT_COLOR, kNT_textCentre, kNT_textTiny);
-    }
-#endif
 }
 
 void renderDisplay(nt_elementsAlgorithm* algo) {
@@ -294,13 +341,13 @@ void renderDisplay(nt_elementsAlgorithm* algo) {
     NT_drawText(PARAM_NAME_X, VERSION_Y, "nt_elements " NT_ELEMENTS_VERSION, TEXT_COLOR, kNT_textLeft, VERSION_FONT);
 #endif
 
-    // Render page title
-    renderPageTitle(algo->current_page);
+    // Render page title (shows page name for 5s, then fades to "Elements")
+    renderPageTitle(algo);
 
     // Render parameters
     renderParameters(algo);
 
-    // Show warning if samples are not loaded
+    // Show warning or attribution at bottom of screen
     renderSampleWarning(algo);
 }
 
