@@ -90,6 +90,10 @@ static const _NT_parameter parameters[kNumParams] = {
     { .name = "Reverb Size", .min = 0, .max = 100, .def = 50, .unit = kNT_unitPercent, .scaling = 0, .enumStrings = NULL },
     { .name = "Reverb Damp", .min = 0, .max = 100, .def = 70, .unit = kNT_unitPercent, .scaling = 0, .enumStrings = NULL },
 
+    // Additional synthesis parameters
+    { .name = "Signature", .min = 0, .max = 100, .def = 0, .unit = kNT_unitPercent, .scaling = 0, .enumStrings = NULL },
+    { .name = "Stereo Mod", .min = 0, .max = 100, .def = 10, .unit = kNT_unitPercent, .scaling = 0, .enumStrings = NULL },
+
     // Page 4 - Performance (6 parameters)
     { .name = "Coarse Tune", .min = 0, .max = 100, .def = 50, .unit = kNT_unitPercent, .scaling = 0, .enumStrings = NULL },
     { .name = "Fine Tune", .min = 0, .max = 100, .def = 50, .unit = kNT_unitPercent, .scaling = 0, .enumStrings = NULL },
@@ -109,11 +113,11 @@ static const _NT_parameter parameters[kNumParams] = {
 
 // Parameter pages for menu organization
 static const uint8_t pageExciter[] = {
-    kParamBowLevel, kParamBlowLevel, kParamStrikeLevel, kParamBowTimbre, kParamBlowTimbre, kParamStrikeTimbre, kParamBlowFlow, kParamStrikeMallet
+    kParamBowLevel, kParamBlowLevel, kParamStrikeLevel, kParamBowTimbre, kParamBlowTimbre, kParamStrikeTimbre, kParamBlowFlow, kParamStrikeMallet, kParamSignature
 };
 
 static const uint8_t pageResonator[] = {
-    kParamGeometry, kParamBrightness, kParamDamping, kParamResonatorPosition, kParamInharmonicity
+    kParamGeometry, kParamBrightness, kParamDamping, kParamResonatorPosition, kParamInharmonicity, kParamStereoMod
 };
 
 static const uint8_t pageSpace[] = {
@@ -244,6 +248,9 @@ static _NT_algorithm* construct(const _NT_algorithmMemoryPtrs& ptrs, const _NT_a
     // Initialize base strength (default = 80%) - must be before perf_state init
     self->base_strength = 0.8f;
 
+    // Initialize FM amount (default = 0, no modulation)
+    self->fm_amount = 0.0f;
+
     // Initialize default performance state (gate ON by default to trigger bow exciter)
     self->perf_state.gate = true;   // Enable gate so bow exciter produces sound on startup
     self->perf_state.note = 69.0f;  // MIDI note number A4 (69)
@@ -295,7 +302,7 @@ static _NT_algorithm* construct(const _NT_algorithmMemoryPtrs& ptrs, const _NT_a
     patch->exciter_strike_level = 0.0f;  // Disabled - uses wavetables
     patch->exciter_strike_meta = 0.5f;
     patch->exciter_strike_timbre = 0.5f;
-    patch->exciter_signature = 1.0f;  // Force to NOISE model (avoid sample players)
+    patch->exciter_signature = 0.0f;  // Default signature (will be set by parameterChanged)
 
     // Resonator defaults (matching NT parameter defaults: 50%, 70%, 60%)
     // parameterChanged() will be called after construct() to sync with actual parameter values
@@ -304,7 +311,7 @@ static _NT_algorithm* construct(const _NT_algorithmMemoryPtrs& ptrs, const _NT_a
     patch->resonator_damping = 0.6f;     // 60% default
     patch->resonator_position = 0.5f;
     patch->resonator_modulation_frequency = 0.5f;
-    patch->resonator_modulation_offset = 0.0f;
+    patch->resonator_modulation_offset = 0.015f;  // 10% default * 0.15 scale (will be set by parameterChanged)
 
     // Reverb defaults
     patch->reverb_diffusion = 0.7f;
@@ -400,6 +407,15 @@ static void parameterChanged(_NT_algorithm* self, int p) {
             patch->reverb_diffusion = parameter_adapter::ntToElements(self->v[kParamReverbDamping]);
             break;
 
+        // Additional synthesis parameters
+        case kParamSignature:
+            patch->exciter_signature = parameter_adapter::ntToElements(self->v[kParamSignature]);
+            break;
+
+        case kParamStereoMod:
+            patch->resonator_modulation_offset = parameter_adapter::ntToElements(self->v[kParamStereoMod]) * 0.15f;  // Scale to 0-0.15 range
+            break;
+
         // Page 4 - Performance parameters
         case kParamCoarseTune:
         case kParamFineTune:
@@ -421,7 +437,8 @@ static void parameterChanged(_NT_algorithm* self, int p) {
             break;
 
         case kParamFMAmount:
-            patch->modulation_frequency = parameter_adapter::ntToElements(self->v[kParamFMAmount]);
+            // Store FM amount for use in step() - will be applied to pitch modulation
+            algo->fm_amount = parameter_adapter::ntToElements(self->v[kParamFMAmount]);
             break;
 
         case kParamExciterContour:
@@ -542,8 +559,10 @@ static void step(_NT_algorithm* self, float* busFrames, int numFramesBy4) {
             algo->perf_state.note = cv_note;
             algo->perf_state.gate = true;
             algo->perf_state.strength = algo->base_strength;  // Use parameter-defined strength for CV input
+        } else {
+            // Gate is LOW - set gate false so strike exciters can retrigger
+            algo->perf_state.gate = false;
         }
-        // If gate is LOW, fall through to use MIDI state (already applied above)
 
         algo->gate_cv_was_high = gate_high;
     }
@@ -554,19 +573,22 @@ static void step(_NT_algorithm* self, float* busFrames, int numFramesBy4) {
     float original_modulation = algo->perf_state.modulation;
     algo->perf_state.modulation = original_modulation + algo->tuning_offset_semitones;
 
-    // Apply CV modulation to patch parameters (control-rate using first sample)
-    elements::Patch* patch = algo->elements_part->mutable_patch();
+    // Apply FM modulation to pitch (via perf_state.modulation)
+    // FM Amount: 0-100% maps to 0-12 semitones of modulation range
+    float fm_range = algo->fm_amount * 12.0f;  // Max ±12 semitones
 
-    // FM Amount CV modulation
+    // FM CV modulation
     const int fm_cv_bus = static_cast<int>(self->v[kParamFMCV]) - 1;
     if (fm_cv_bus >= 0 && fm_cv_bus < 28 && busFrames) {
         const float* fm_cv = busFrames + (fm_cv_bus * numFrames);
-        // CV range: -5V to +5V modulates FM amount (bipolar)
-        // Clamp to prevent excessive modulation
+        // CV range: -5V to +5V maps to -1 to +1 modulation depth
         float fm_mod = fmaxf(-1.0f, fminf(1.0f, fm_cv[0] * 0.2f));
-        patch->modulation_frequency = fmaxf(0.0f, fminf(1.0f,
-            parameter_adapter::ntToElements(self->v[kParamFMAmount]) + fm_mod));
+        // Apply FM: CV modulates pitch by fm_range semitones
+        algo->perf_state.modulation += fm_mod * fm_range;
     }
+
+    // Apply CV modulation to patch parameters (control-rate using first sample)
+    elements::Patch* patch = algo->elements_part->mutable_patch();
 
     // Brightness CV modulation
     const int brightness_cv_bus = static_cast<int>(self->v[kParamBrightnessCV]) - 1;

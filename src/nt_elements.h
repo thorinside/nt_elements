@@ -72,6 +72,9 @@ struct nt_elementsAlgorithm : public _NT_algorithm {
     // Excitation strength (base value, can be modulated by MIDI velocity)
     float base_strength;
 
+    // FM amount (stored here so it can be applied to perf_state.modulation in step)
+    float fm_amount;
+
     // CV input state
     bool gate_cv_was_high;  // For gate edge detection
 };

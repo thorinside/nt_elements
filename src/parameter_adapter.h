@@ -46,6 +46,10 @@ enum ParameterIndices {
     kParamReverbSize,        // Reverb room size/time (0-100% → 0.0-1.0)
     kParamReverbDamping,     // Reverb high-freq damping (0-100% → 0.0-1.0)
 
+    // Additional synthesis parameters
+    kParamSignature,         // Exciter signature/character (0-100% → 0.0-1.0)
+    kParamStereoMod,         // Stereo modulation offset (0-100% → 0.0-1.0)
+
     // Performance/Tuning parameters
     kParamCoarseTune,        // Coarse tuning (-12 to +12 semitones, 0-100% scale)
     kParamFineTune,          // Fine tuning (-50 to +50 cents, 0-100% scale)
