@@ -63,10 +63,10 @@ static const _NT_parameter parameters[kNumParams] = {
     // System parameters - Dual external inputs for Elements
     // Blow Input: Audio goes through diffusion → envelope → STRENGTH VCA → resonator
     // Strike Input: Audio goes directly to resonator (unprocessed)
-    NT_PARAMETER_AUDIO_INPUT("Blow Input", 1, 1)
+    NT_PARAMETER_AUDIO_INPUT("Blow Input", 0, 0)
     NT_PARAMETER_AUDIO_INPUT("Strike Input", 0, 0)
     NT_PARAMETER_AUDIO_OUTPUT_WITH_MODE("Main Output", 1, 13)
-    NT_PARAMETER_AUDIO_OUTPUT_WITH_MODE("Aux Output", 1, 14)
+    NT_PARAMETER_AUDIO_OUTPUT_WITH_MODE("Aux Output", 0, 14)
 
     // Page 1 - Exciter (8 parameters)
     { .name = "Bow Level", .min = 0, .max = 100, .def = 80, .unit = kNT_unitPercent, .scaling = 0, .enumStrings = NULL },
@@ -93,7 +93,7 @@ static const _NT_parameter parameters[kNumParams] = {
     // Page 4 - Performance (6 parameters)
     { .name = "Coarse Tune", .min = 0, .max = 100, .def = 50, .unit = kNT_unitPercent, .scaling = 0, .enumStrings = NULL },
     { .name = "Fine Tune", .min = 0, .max = 100, .def = 50, .unit = kNT_unitPercent, .scaling = 0, .enumStrings = NULL },
-    { .name = "Output Lvl", .min = 0, .max = 100, .def = 100, .unit = kNT_unitPercent, .scaling = 0, .enumStrings = NULL },
+    { .name = "Output Lvl", .min = 0, .max = 100, .def = 80, .unit = kNT_unitPercent, .scaling = 0, .enumStrings = NULL },
     { .name = "FM Amount", .min = 0, .max = 100, .def = 0, .unit = kNT_unitPercent, .scaling = 0, .enumStrings = NULL },
     { .name = "Exciter Cnt", .min = 0, .max = 100, .def = 50, .unit = kNT_unitPercent, .scaling = 0, .enumStrings = NULL },
     { .name = "Strength", .min = 0, .max = 100, .def = 80, .unit = kNT_unitPercent, .scaling = 0, .enumStrings = NULL },
