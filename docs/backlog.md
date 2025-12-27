@@ -24,3 +24,13 @@ Routing guidance:
 | 2025-11-02 | 2.1 | 2 | Enhancement | Low | Dev Agent | Open | Add basic OLED `draw()` callback to show current page name on button press (AC #6 partial) or document explicit deferral to Story 2.2 (`src/nt_elements.cpp`). |
 | 2025-11-02 | 2.1 | 2 | Enhancement | High | Dev Agent | Closed | Implement stereo output routing for Elements reverb - added Main Output (bus 13) and Aux Output (bus 14) with independent mix/replace modes. Completed 2025-11-02. |
 | 2025-11-02 | 2.1 | 2 | Feature | Medium | Dev Agent | Closed | Add essential CV inputs for common modulation targets: FM CV, Brightness CV, Expression CV. Enables expressive performance without manual CV mapping. Completed 2025-11-02. |
+| 2025-12-26 | 3.3 | 3 | Bug | High | TBD | Closed | Wired `SampleManager` into plugin memory allocation/lifecycle (`src/nt_elements.cpp`: DRAM requirements + construct/step integration). |
+| 2025-12-26 | 3.3 | 3 | Bug | High | TBD | Closed | Fixed `SampleManager::loadSamples()` success semantics (tracks failures; `loaded_` only true on full success) (`src/sample_manager.cpp`). |
+| 2025-12-26 | 3.3 | 3 | TechDebt | High | TBD | Closed | Replaced timeout/spin-wait with a non-blocking state machine and persisted `_NT_wavRequest` until callback fires (`src/sample_manager.cpp`). |
+| 2025-12-26 | 3.3 | 3 | Enhancement | Medium | TBD | Closed | Validate sample file ordering by name and basic format via `NT_getSampleFileInfo()` before loading (`src/sample_manager.cpp`). |
+| 2025-12-26 | 3.3 | 3 | Bug | High | TBD | Closed | Removed blocking SD I/O from `step()` by switching to non-blocking `loadStep()`; gated progress via callback completion (`src/nt_elements.cpp`, `src/sample_manager.cpp`). |
+| 2025-12-26 | 3.3 | 3 | Enhancement | Medium | TBD | Closed | Added retry/backoff when mounted and load fails (`src/sample_manager.cpp`). |
+| 2025-12-26 | 3.3 | 3 | Enhancement | Low | TBD | Closed | Added frame count validation via `NT_getSampleFileInfo()`; sample rate conversion allowed per WAV API (`src/sample_manager.cpp`). |
+| 2025-12-26 | 3.3 | 3 | TechDebt | Low | TBD | Closed | Story documentation now matches implementation (non-blocking state machine + persistent request). |
+| 2025-12-26 | 3.4 | 3 | Bug | Medium | TBD | Open | Reconcile AC #2 requirement for function-based sample access in `external/mutable-instruments/elements/dsp/exciter.cc` or update AC to match macro redirection. |
+| 2025-12-26 | 3.4 | 3 | Enhancement | Medium | TBD | Open | Complete hardware validation to confirm exciter behavior unchanged and document results (AC #7). |

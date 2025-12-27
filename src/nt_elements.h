@@ -13,6 +13,10 @@
 
 #include "distingnt/api.h"
 #include "elements/dsp/part.h"
+#include "sample_manager.h"
+
+// Elements requires exactly 16 samples per block
+static constexpr int kElementsBlockSize = 16;
 
 // Forward declaration of algorithm structure
 struct nt_elementsAlgorithm : public _NT_algorithm {
@@ -28,8 +32,21 @@ struct nt_elementsAlgorithm : public _NT_algorithm {
     float* temp_main_out;
     float* temp_aux_out;
 
+    // Block size adaptation buffers (VCV uses 4-sample blocks, Elements needs 16)
+    // We accumulate input until we have 16 samples, then process through Elements.
+    float input_buffer[kElementsBlockSize];
+    float output_main[kElementsBlockSize];
+    float output_aux[kElementsBlockSize];
+    int buffer_pos;  // Current position in buffers (0-15)
+
     // Memory region pointers for cleanup tracking
     uint16_t* reverb_buffer;
+
+    // Sample manager for loading wavetables and noise samples
+    SampleManager sample_manager;
+
+    // Track SD card mount state for late loading
+    bool sd_card_was_mounted;
 
     // MIDI state for monophonic voice management
     uint8_t current_note;

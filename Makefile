@@ -15,10 +15,13 @@ STMLIB_ROOT = external/mutable-instruments/stmlib
 VERSION := $(shell git describe --tags --always --dirty 2>/dev/null || echo "v1.0.0-dev")
 
 # Source files
+# Note: Using resources_luts_only.cc (LUTs without sample data)
+# Sample data now loaded dynamically via SampleManager from SD card
 SOURCES = \
 	src/nt_elements.cpp \
 	src/oled_display.cpp \
-	src/resources_minimal_wavetables.cc \
+	src/sample_manager.cpp \
+	src/resources_luts_only.cc \
 	external/mutable-instruments/elements/dsp/exciter.cc \
 	external/mutable-instruments/elements/dsp/multistage_envelope.cc \
 	external/mutable-instruments/elements/dsp/ominous_voice.cc \
@@ -79,17 +82,19 @@ PATCH_DIR = patches
 PATCH_MARKER = external/mutable-instruments/elements/dsp/.nt_elements_patched
 
 # Targets
-.PHONY: all hardware test clean apply-patches
+.PHONY: all hardware test clean apply-patches extract-samples
 
 all: apply-patches hardware test
 
 # Apply patches to Elements DSP if not already applied
+# Patch order: sample-rate first, then samples (samples patch depends on clean resources.h)
 apply-patches:
 	@if [ ! -f $(PATCH_MARKER) ]; then \
 		echo "Applying Elements DSP patches..."; \
-		cd external/mutable-instruments/elements/dsp && \
-		patch -p5 < ../../../../$(PATCH_DIR)/elements-dynamic-sample-rate.patch && \
-		touch .nt_elements_patched && \
+		cd external/mutable-instruments && \
+		patch -p1 < ../../$(PATCH_DIR)/elements-dynamic-sample-rate.patch && \
+		patch -p1 < ../../$(PATCH_DIR)/elements-dynamic-samples.patch && \
+		touch elements/dsp/.nt_elements_patched && \
 		echo "Patches applied successfully"; \
 	fi
 
@@ -158,3 +163,15 @@ clean:
 clean-all: clean
 	rm -f $(PATCH_MARKER)
 	@echo "Build artifacts and patch marker cleaned"
+
+# Extract wavetable and noise samples from resources.cc into WAV files
+# Samples are needed for dynamic sample loading (Epic 3)
+SAMPLES_DIR = samples/elements
+extract-samples:
+	@if [ ! -f $(SAMPLES_DIR)/wavetable_00.wav ]; then \
+		echo "Extracting samples from resources.cc..."; \
+		python3 scripts/extract_samples.py; \
+	else \
+		echo "Samples already extracted in $(SAMPLES_DIR)"; \
+		echo "Use 'python3 scripts/extract_samples.py --force' to regenerate"; \
+	fi

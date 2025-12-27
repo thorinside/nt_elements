@@ -22,3 +22,6 @@ plugins/*.so
 
 # Note: We keep plugins/ directory but ignore built libraries
 # Hardware .o files may be committed for deployment tracking
+
+# Extracted samples (generated from resources.cc)
+samples/elements/

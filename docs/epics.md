@@ -356,4 +356,26 @@ So that [benefit/value].
 
 ---
 
+## Epic 3: Dynamic Sample Loading from SD Card
+
+**Timeline:** Post-release enhancement
+**Story Count:** 5 stories
+**Goal:** Replace static compiled sample data with dynamic loading from SD card, reducing binary size and enabling user-customizable wavetables.
+
+**See:** [Epic 3 Detail Document](./epic-3-dynamic-sample-loading.md)
+
+---
+
+---
+
+## Epic 4: Audio Quality and Missing Parameters
+
+**Timeline:** Post Epic 3
+**Story Count:** 9 stories
+**Goal:** Address audio output level issues, expose missing synthesis parameters, and implement dual external input routing to match original Elements hardware.
+
+**See:** [Epic 4 Detail Document](./epic-4-audio-quality-and-parameters.md)
+
+---
+
 **For implementation:** Use the `create-story` workflow to generate individual story implementation plans from this epic breakdown.

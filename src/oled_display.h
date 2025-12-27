@@ -105,6 +105,13 @@ const char* getParamName(int param_index);
 int formatParamValue(int param_index, float value, char* buffer);
 
 /**
+ * Render warning message when samples are not loaded
+ * Shows loading status or error message at bottom of screen
+ * @param algo Algorithm instance
+ */
+void renderSampleWarning(nt_elementsAlgorithm* algo);
+
+/**
  * Render the complete display for the current page
  * Called from draw() callback when display_dirty flag is set
  * @param algo Algorithm instance

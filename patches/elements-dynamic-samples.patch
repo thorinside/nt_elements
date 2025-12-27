@@ -1,0 +1,28 @@
+--- a/elements/resources.h	2025-11-02 16:16:40
++++ b/elements/resources.h	2025-12-26 10:54:40
+@@ -72,9 +72,22 @@
+ extern const float lut_fm_frequency_quantizer[];
+ extern const float lut_detune_quantizer[];
+ extern const float lut_svf_shift[];
+-extern const int16_t smp_sample_data[];
+-extern const int16_t smp_noise_sample[];
+-extern const size_t smp_boundaries[];
++
++// nt_elements modification: Dynamic sample data pointers
++// Original arrays are replaced with extern pointers set by nt_elements
++// after loading samples from SD card via SampleManager.
++// This allows samples to be loaded dynamically rather than compiled in.
++extern const int16_t* smp_sample_data_ptr;
++extern const int16_t* smp_noise_sample_ptr;
++extern const size_t* smp_boundaries_ptr;
++
++// Macro redirections - make existing code use pointers transparently
++// exciter.cc uses smp_sample_data[offset], smp_noise_sample[offset], smp_boundaries[i]
++// With these macros, the same syntax works but dereferences our dynamic pointers
++#define smp_sample_data smp_sample_data_ptr
++#define smp_noise_sample smp_noise_sample_ptr
++#define smp_boundaries smp_boundaries_ptr
++
+ #define LUT_DB_LED_BRIGHTNESS 0
+ #define LUT_DB_LED_BRIGHTNESS_SIZE 513
+ #define LUT_SINE 0

@@ -16,6 +16,7 @@
 #include <cstdio>
 #endif
 #include "distingnt/api.h"
+#include "distingnt/wav.h"
 #include "elements/dsp/part.h"
 #include "elements/dsp/dsp.h"
 
@@ -34,6 +35,15 @@
 #include "parameter_pages.h"
 #include "nt_elements.h"
 #include "oled_display.h"
+#include "sample_manager.h"
+
+// Global pointers for Elements sample data (declared in elements/resources.h via patch)
+// These are set after SampleManager loads samples from SD card
+namespace elements {
+const int16_t* smp_sample_data_ptr = nullptr;
+const int16_t* smp_noise_sample_ptr = nullptr;
+const size_t* smp_boundaries_ptr = nullptr;
+}
 
 // Factory functions forward declarations
 static void calculateStaticRequirements(_NT_staticRequirements& req);
@@ -168,8 +178,9 @@ static void calculateRequirements(_NT_algorithmRequirements& req, const int32_t*
     // SRAM: Temp buffers for audio processing (4 * 512 floats = 8KB)
     req.sram = sizeof(nt_elementsAlgorithm) + (4 * 512 * sizeof(float));
 
-    // DRAM: Reverb buffer (32768 samples = 64KB for uint16_t)
-    req.dram = 32768 * sizeof(uint16_t);
+    // DRAM: Reverb buffer (32768 samples = 64KB for uint16_t) + Sample data (~338KB)
+    // Layout: [reverb_buffer (64KB)] [sample_data (~338KB)]
+    req.dram = (32768 * sizeof(uint16_t)) + SampleManager::kTotalDramBytes;
 
     req.itc = 0;
 }
@@ -202,8 +213,20 @@ static _NT_algorithm* construct(const _NT_algorithmMemoryPtrs& ptrs, const _NT_a
     memset(self->temp_main_out, 0, 512 * sizeof(float));
     memset(self->temp_aux_out, 0, 512 * sizeof(float));
 
-    // Allocate reverb buffer from DRAM
+    // Allocate reverb buffer from DRAM (first 64KB)
     self->reverb_buffer = reinterpret_cast<uint16_t*>(ptrs.dram);
+
+    // Initialize sample manager with remaining DRAM (after reverb buffer)
+    // DRAM layout: [reverb_buffer (64KB)] [sample_data (~338KB)]
+    uint8_t* sample_dram = reinterpret_cast<uint8_t*>(ptrs.dram) + (32768 * sizeof(uint16_t));
+    self->sample_manager.init(reinterpret_cast<int16_t*>(sample_dram));
+    self->sd_card_was_mounted = false;
+
+    // Initialize global sample pointers to point to zero-filled buffers
+    // These will be updated to real samples when loading completes in step()
+    elements::smp_sample_data_ptr = self->sample_manager.getSampleData();
+    elements::smp_noise_sample_ptr = self->sample_manager.getNoiseSample();
+    elements::smp_boundaries_ptr = self->sample_manager.getBoundaries();
 
     // Use placement new to construct Elements Part in DTC
     self->elements_part = new (ptrs.dtc) elements::Part();
@@ -238,6 +261,12 @@ static _NT_algorithm* construct(const _NT_algorithmMemoryPtrs& ptrs, const _NT_a
 
     // Initialize CV input state
     self->gate_cv_was_high = false;
+
+    // Initialize block size adaptation buffers
+    memset(self->input_buffer, 0, sizeof(self->input_buffer));
+    memset(self->output_main, 0, sizeof(self->output_main));
+    memset(self->output_aux, 0, sizeof(self->output_aux));
+    self->buffer_pos = 0;
 
     // Initialize default patch parameters (balanced modal sound)
     elements::Patch* patch = self->elements_part->mutable_patch();
@@ -404,6 +433,29 @@ static void step(_NT_algorithm* self, float* busFrames, int numFramesBy4) {
         return;  // Plugin being destroyed during reload
     }
 
+    // Non-blocking sample loading via state machine
+    // Per distingNT API: "All built-in algorithms watch for card (un)mount in step()"
+    bool sd_mounted = NT_isSdCardMounted();
+    if (!sd_mounted && algo->sd_card_was_mounted) {
+        // SD card just unmounted - reset sample manager for potential reload
+        algo->sample_manager.reset();
+        // Reset global pointers to point to zero-filled buffers
+        elements::smp_sample_data_ptr = algo->sample_manager.getSampleData();
+        elements::smp_noise_sample_ptr = algo->sample_manager.getNoiseSample();
+        elements::smp_boundaries_ptr = algo->sample_manager.getBoundaries();
+    }
+    algo->sd_card_was_mounted = sd_mounted;
+
+    // Call loadStep() each frame - it's non-blocking and manages its own state machine
+    // Samples will load progressively over multiple step() calls
+    if (algo->sample_manager.loadStep()) {
+        // Samples just loaded (or already loaded) - update global pointers for Elements DSP
+        // These pointers are used by exciter.cc via macros in resources.h
+        elements::smp_sample_data_ptr = algo->sample_manager.getSampleData();
+        elements::smp_noise_sample_ptr = algo->sample_manager.getNoiseSample();
+        elements::smp_boundaries_ptr = algo->sample_manager.getBoundaries();
+    }
+
     // Apply pending MIDI updates atomically (thread-safe)
     if (algo->pending_update) {
         // Copy fields individually to ensure proper memory ordering on ARM
@@ -539,62 +591,50 @@ static void step(_NT_algorithm* self, float* busFrames, int numFramesBy4) {
         return;
     }
 
-    // Elements' internal buffers operate on kMaxBlockSize (16) samples.
-    // Slice disting NT blocks into safe chunks to avoid overruns on hardware.
-    const int kElementsBlockSize = 16;
-    for (int offset = 0; offset < numFrames; offset += kElementsBlockSize) {
-        const int remaining = numFrames - offset;
-        const int chunk = remaining >= kElementsBlockSize ? kElementsBlockSize : remaining;
+    // Elements DSP requires exactly 16 samples per block.
+    // We accumulate input until we have 16 samples, then process through Elements.
+    // The emulator guarantees outputs are read before processing, so single buffering works.
 
-        // Copy current sub-block. For partial chunks, extend with the last sample
-        // to avoid hard transitions that would create clicks.
-        const float* inputChunk = input + offset;
-        memcpy(algo->temp_blow_in, inputChunk, chunk * sizeof(float));
-        if (chunk < kElementsBlockSize) {
-            const float padValue = chunk > 0 ? inputChunk[chunk - 1] : 0.0f;
-            for (int i = chunk; i < kElementsBlockSize; ++i) {
-                algo->temp_blow_in[i] = padValue;
-            }
-        }
-        memset(algo->temp_strike_in, 0, kElementsBlockSize * sizeof(float));
+    for (int i = 0; i < numFrames; ++i) {
+        // Store input sample in accumulation buffer
+        algo->input_buffer[algo->buffer_pos] = input[i];
 
-        // Always process audio - Elements will use gate state internally to control exciter
-        // but the resonator should always respond to audio input
-        algo->elements_part->Process(
-            algo->perf_state,
-            algo->temp_blow_in,
-            algo->temp_strike_in,
-            algo->temp_main_out,
-            algo->temp_aux_out,
-            static_cast<size_t>(kElementsBlockSize)
-        );
-
-        // Get output chunk pointers (already validated above)
-        float* outputChunk = output + offset;
-        float* auxOutputChunk = auxOutput + offset;
+        // Output from buffer (filled in previous processing cycle)
+        float main_out = algo->output_main[algo->buffer_pos] * algo->output_level_scale;
+        float aux_out = algo->output_aux[algo->buffer_pos] * algo->output_level_scale;
 
         if (outputMode == 1) {
-            // Replace mode: copy with output level scaling
-            for (int i = 0; i < chunk; ++i) {
-                outputChunk[i] = algo->temp_main_out[i] * algo->output_level_scale;
-            }
+            output[i] = main_out;  // Replace mode
         } else {
-            // Mix mode: add with output level scaling
-            for (int i = 0; i < chunk; ++i) {
-                outputChunk[i] += algo->temp_main_out[i] * algo->output_level_scale;
-            }
+            output[i] += main_out;  // Mix mode
         }
 
         if (auxOutputMode == 1) {
-            // Replace mode: copy with output level scaling
-            for (int i = 0; i < chunk; ++i) {
-                auxOutputChunk[i] = algo->temp_aux_out[i] * algo->output_level_scale;
-            }
+            auxOutput[i] = aux_out;  // Replace mode
         } else {
-            // Mix mode: add with output level scaling
-            for (int i = 0; i < chunk; ++i) {
-                auxOutputChunk[i] += algo->temp_aux_out[i] * algo->output_level_scale;
-            }
+            auxOutput[i] += aux_out;  // Mix mode
+        }
+
+        // Advance buffer position
+        algo->buffer_pos++;
+
+        // When we've accumulated 16 samples, process through Elements
+        if (algo->buffer_pos >= kElementsBlockSize) {
+            algo->buffer_pos = 0;
+
+            // Copy accumulated input to Elements temp buffer
+            memcpy(algo->temp_blow_in, algo->input_buffer, kElementsBlockSize * sizeof(float));
+            memset(algo->temp_strike_in, 0, kElementsBlockSize * sizeof(float));
+
+            // Process full block through Elements DSP
+            algo->elements_part->Process(
+                algo->perf_state,
+                algo->temp_blow_in,
+                algo->temp_strike_in,
+                algo->output_main,
+                algo->output_aux,
+                static_cast<size_t>(kElementsBlockSize)
+            );
         }
     }
 

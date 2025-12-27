@@ -58,3 +58,21 @@ development_status:
   2-6-sound-quality-a-b-validation: done
   2-7-final-testing-and-release-preparation: done
   epic-2-retrospective: completed
+  epic-3: backlog
+  3-1-update-distingnt-api-submodule: done
+  3-2-sample-extraction-script: done
+  3-3-sample-manager-implementation: done
+  3-4-elements-exciter-patch: done
+  3-5-integration-and-validation: done
+  epic-3-retrospective: optional
+  epic-4: backlog
+  4-1-audio-output-level-scaling: ready-for-dev
+  4-2-add-flow-parameter: ready-for-dev
+  4-3-add-mallet-parameter: ready-for-dev
+  4-4-add-strength-parameter: ready-for-dev
+  4-5-reorganize-parameter-pages: ready-for-dev
+  4-6-add-strike-timbre-parameter: ready-for-dev
+  4-7-validation-and-ab-testing: ready-for-dev
+  4-8-dual-external-input-routing: ready-for-dev
+  4-9-add-emilie-gillet-attribution: ready-for-dev
+  epic-4-retrospective: optional

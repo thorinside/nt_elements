@@ -244,6 +244,46 @@ void renderParameters(nt_elementsAlgorithm* algo) {
     }
 }
 
+void renderSampleWarning(nt_elementsAlgorithm* algo) {
+    const int WARNING_Y = SCREEN_HEIGHT - 8;  // Bottom of screen
+
+    // Check if samples are loaded using the sample manager
+    if (!algo->sample_manager.isLoaded()) {
+        // Get loading state for more specific message
+        SampleManager::LoadState state = algo->sample_manager.getLoadState();
+        const char* message;
+
+        switch (state) {
+            case SampleManager::LoadState::IDLE:
+            case SampleManager::LoadState::VALIDATING:
+            case SampleManager::LoadState::LOADING_WAVETABLE:
+            case SampleManager::LoadState::LOADING_NOISE:
+                message = "Loading samples...";
+                break;
+            case SampleManager::LoadState::FAILED:
+                message = "Samples not found";
+                break;
+            default:
+                message = "No samples";
+                break;
+        }
+
+        NT_drawText(SCREEN_WIDTH / 2, WARNING_Y, message, TEXT_COLOR, kNT_textCentre, kNT_textTiny);
+    }
+#ifdef NT_EMU_DEBUG
+    else {
+        // Debug: Show sample rate and first sample value
+        // Expected: S0:-964, SR:48000 (or VCV's actual rate)
+        const int16_t* samples = algo->sample_manager.getSampleData();
+        char debug_buf[32];
+        snprintf(debug_buf, sizeof(debug_buf), "S0:%d SR:%u",
+                 static_cast<int>(samples[0]),
+                 static_cast<unsigned>(NT_globals.sampleRate));
+        NT_drawText(SCREEN_WIDTH / 2, WARNING_Y, debug_buf, TEXT_COLOR, kNT_textCentre, kNT_textTiny);
+    }
+#endif
+}
+
 void renderDisplay(nt_elementsAlgorithm* algo) {
     if (!algo) {
         return;
@@ -259,6 +299,9 @@ void renderDisplay(nt_elementsAlgorithm* algo) {
 
     // Render parameters
     renderParameters(algo);
+
+    // Show warning if samples are not loaded
+    renderSampleWarning(algo);
 }
 
 } // namespace oled_display
