@@ -40,17 +40,36 @@ jobs:
           make clean
           make hardware
 
-      - name: Prepare directory structure for nt_elements zip
+      - name: Extract sample WAV files
         run: |
-          mkdir -p release/programs/plug-ins/nt_elements
-          echo "Copying nt_elements.o"
-          cp plugins/nt_elements.o release/programs/plug-ins/nt_elements/
+          echo "Extracting wavetable and noise samples from resources.cc"
+          python3 scripts/extract_samples.py --force
+          echo "Extracted samples:"
+          ls -la samples/elements/
 
-      - name: Zip nt_elements plugin artifact
+      - name: Prepare directory structure for release zip
+        run: |
+          # Create plugin directory (note: "elements" not "nt_elements")
+          mkdir -p release/programs/plug-ins/elements
+          echo "Copying nt_elements.o to programs/plug-ins/elements/"
+          cp plugins/nt_elements.o release/programs/plug-ins/elements/
+
+          # Create samples directory
+          mkdir -p release/samples/elements
+          echo "Copying sample WAV files to samples/elements/"
+          cp samples/elements/*.wav release/samples/elements/
+
+          # Show final structure
+          echo "Release directory structure:"
+          find release -type f
+
+      - name: Zip release artifact
         run: |
           cd release
-          zip -r ../nt_elements-plugin.zip programs
+          zip -r ../nt_elements-plugin.zip programs samples
           cd ..
+          echo "Created zip contents:"
+          unzip -l nt_elements-plugin.zip
 
       - name: Generate Release Notes
         run: |
