@@ -66,6 +66,9 @@ enum ParameterIndices {
     kParamBrightnessCV,      // Resonator Brightness CV input bus (0=none, 1-28=bus number)
     kParamExpressionCV,      // Exciter Expression/Dynamics CV input bus (0=none, 1-28=bus number)
 
+    // Easter egg (OminousVoice FM synthesis mode)
+    kParamEasterEgg,         // Easter egg toggle (0=Off, 1=On)
+
     kNumParams
 };
 

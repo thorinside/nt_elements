@@ -15,13 +15,13 @@ STMLIB_ROOT = external/mutable-instruments/stmlib
 VERSION := $(shell git describe --tags --always --dirty 2>/dev/null || echo "v1.0.0-dev")
 
 # Source files
-# Note: Using resources_luts_only.cc (LUTs without sample data)
-# Sample data now loaded dynamically via SampleManager from SD card
+# LUTs are generated at runtime by lut_generator.cpp (saves ~33KB .rodata)
+# Sample data loaded dynamically via SampleManager from SD card
 SOURCES = \
 	src/nt_elements.cpp \
 	src/oled_display.cpp \
 	src/sample_manager.cpp \
-	src/resources_luts_only.cc \
+	src/lut_generator.cpp \
 	external/mutable-instruments/elements/dsp/exciter.cc \
 	external/mutable-instruments/elements/dsp/multistage_envelope.cc \
 	external/mutable-instruments/elements/dsp/ominous_voice.cc \
@@ -33,9 +33,8 @@ SOURCES = \
 	external/mutable-instruments/stmlib/utils/random.cc \
 	external/mutable-instruments/stmlib/dsp/units.cc
 
-# Using extracted LUTs only (no wavetable sample data)
-# Full resources.cc = 372KB, extracted = all LUTs but stub wavetables
-# Limitation: Wavetable oscillator mode unavailable, resonator modes should work
+# LUTs generated at runtime in DRAM (saves ~33KB .rodata, keeps .text+.rodata under 64KB)
+# Wavetable sample data loaded dynamically from SD card
 
 # Include paths and defines
 INCLUDES = \
@@ -89,13 +88,16 @@ PATCH_MARKER = external/mutable-instruments/elements/dsp/.nt_elements_patched
 all: apply-patches hardware test
 
 # Apply patches to Elements DSP if not already applied
-# Patch order: sample-rate first, then samples (samples patch depends on clean resources.h)
+# Patch order: sample-rate first, then samples+LUT pointers, then stmlib LUT pointers
 apply-patches:
 	@if [ ! -f $(PATCH_MARKER) ]; then \
 		echo "Applying Elements DSP patches..."; \
 		cd external/mutable-instruments && \
 		patch -p1 < ../../$(PATCH_DIR)/elements-dynamic-sample-rate.patch && \
 		patch -p1 < ../../$(PATCH_DIR)/elements-dynamic-samples.patch && \
+		cd stmlib && \
+		patch -p1 < ../../../$(PATCH_DIR)/stmlib-runtime-luts.patch && \
+		cd .. && \
 		touch elements/dsp/.nt_elements_patched && \
 		echo "Patches applied successfully"; \
 	fi
@@ -135,7 +137,7 @@ $(PLUGINS_DIR)/$(PROJECT).o: $(OBJS) | $(PLUGINS_DIR)
 	$(CXX_ARM) -r $(OBJS) -o $@
 	@echo "Hardware build complete: $@"
 	@ls -lh $@
-	@echo "NOTE: Built with minimal wavetables (all LUTs + noise + 2 smallest wavetables): ~180KB vs 407KB full"
+	@echo "NOTE: LUTs generated at runtime in DRAM. Target .text+.rodata < 64KB."
 
 # Test target - native .dylib/.so for VCV Rack nt_emu
 test: apply-patches $(PLUGINS_DIR)/$(PROJECT).$(DYLIB_EXT)

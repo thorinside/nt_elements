@@ -1,12 +1,54 @@
---- a/elements/resources.h	2025-11-02 16:16:40
-+++ b/elements/resources.h	2025-12-26 10:54:40
-@@ -72,9 +72,22 @@
- extern const float lut_fm_frequency_quantizer[];
- extern const float lut_detune_quantizer[];
- extern const float lut_svf_shift[];
+diff --git a/elements/resources.h b/elements/resources.h
+index 0bb54e3..516b8c8 100644
+--- a/elements/resources.h
++++ b/elements/resources.h
+@@ -52,29 +52,42 @@ extern const int16_t* sample_table[];
+ 
+ extern const size_t* sample_boundary_table[];
+ 
+-extern const int16_t lut_db_led_brightness[];
+-extern const float lut_sine[];
+-extern const float lut_approx_svf_gain[];
+-extern const float lut_approx_svf_g[];
+-extern const float lut_approx_svf_r[];
+-extern const float lut_approx_svf_h[];
+-extern const float lut_4_decades[];
+-extern const float lut_accent_gain_coarse[];
+-extern const float lut_accent_gain_fine[];
+-extern const float lut_stiffness[];
+-extern const float lut_env_increments[];
+-extern const float lut_env_linear[];
+-extern const float lut_env_expo[];
+-extern const float lut_env_quartic[];
+-extern const float lut_midi_to_f_high[];
+-extern const float lut_midi_to_increment_high[];
+-extern const float lut_midi_to_f_low[];
+-extern const float lut_fm_frequency_quantizer[];
+-extern const float lut_detune_quantizer[];
+-extern const float lut_svf_shift[];
 -extern const int16_t smp_sample_data[];
 -extern const int16_t smp_noise_sample[];
 -extern const size_t smp_boundaries[];
++extern const int16_t* lut_db_led_brightness;
++extern const float* lut_sine;
++extern const float* lut_approx_svf_gain;
++extern const float* lut_approx_svf_g;
++extern const float* lut_approx_svf_r;
++extern const float* lut_approx_svf_h;
++extern const float* lut_4_decades;
++extern const float* lut_accent_gain_coarse;
++extern const float* lut_accent_gain_fine;
++extern const float* lut_stiffness;
++extern const float* lut_env_increments;
++extern const float* lut_env_linear;
++extern const float* lut_env_expo;
++extern const float* lut_env_quartic;
++extern const float* lut_midi_to_f_high;
++extern const float* lut_midi_to_increment_high;
++extern const float* lut_midi_to_f_low;
++extern const float* lut_fm_frequency_quantizer;
++extern const float* lut_detune_quantizer;
++extern const float* lut_svf_shift;
 +
 +// nt_elements modification: Dynamic sample data pointers
 +// Original arrays are replaced with extern pointers set by nt_elements

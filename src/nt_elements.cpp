@@ -36,6 +36,7 @@
 #include "nt_elements.h"
 #include "oled_display.h"
 #include "sample_manager.h"
+#include "lut_generator.h"
 
 // Global pointers for Elements sample data (declared in elements/resources.h via patch)
 // These are set after SampleManager loads samples from SD card
@@ -57,6 +58,9 @@ static void midiMessage(_NT_algorithm* self, uint8_t b0, uint8_t b1, uint8_t b2)
 static uint32_t hasCustomUi(_NT_algorithm* self);
 static void customUi(_NT_algorithm* self, const _NT_uiData& data);
 static void setupUi(_NT_algorithm* self, _NT_float3& pots);
+
+// Easter Egg enum strings
+static const char* const easterEggStrings[] = { "Off", "On", nullptr };
 
 // Parameter definitions
 static const _NT_parameter parameters[kNumParams] = {
@@ -109,6 +113,9 @@ static const _NT_parameter parameters[kNumParams] = {
     NT_PARAMETER_CV_INPUT("FM CV", 0, 0)
     NT_PARAMETER_CV_INPUT("Bright CV", 0, 0)
     NT_PARAMETER_CV_INPUT("Expr CV", 0, 0)
+
+    // Easter Egg (OminousVoice FM synthesis mode)
+    { .name = "Easter Egg", .min = 0, .max = 1, .def = 0, .unit = kNT_unitEnum, .scaling = kNT_scalingNone, .enumStrings = easterEggStrings },
 };
 
 // Parameter pages for menu organization
@@ -132,7 +139,8 @@ static const uint8_t pageRouting[] = {
     kParamBlowInputBus, kParamStrikeInputBus, kParamOutputBus, kParamOutputMode,
     kParamAuxOutputBus, kParamAuxOutputMode,
     kParamMidiChannel, kParamVOctCV, kParamGateCV,
-    kParamFMCV, kParamBrightnessCV, kParamExpressionCV
+    kParamFMCV, kParamBrightnessCV, kParamExpressionCV,
+    kParamEasterEgg
 };
 
 static const _NT_parameterPage pages[] = {
@@ -173,11 +181,11 @@ static const _NT_factory factory = {
 // Factory implementations
 
 static void calculateStaticRequirements(_NT_staticRequirements& req) {
-    req.dram = 0;  // No shared static memory needed
+    req.dram = lutGeneratorTotalBytes();
 }
 
-static void initialise(_NT_staticMemoryPtrs& /*ptrs*/, const _NT_staticRequirements& /*req*/) {
-    // No static initialization needed
+static void initialise(_NT_staticMemoryPtrs& ptrs, const _NT_staticRequirements& /*req*/) {
+    lutGeneratorInit(ptrs.dram);
 }
 
 static void calculateRequirements(_NT_algorithmRequirements& req, const int32_t* /*specifications*/) {
@@ -447,6 +455,10 @@ static void parameterChanged(_NT_algorithm* self, int p) {
 
         case kParamStrength:
             algo->base_strength = parameter_adapter::ntToElements(self->v[kParamStrength]);
+            break;
+
+        case kParamEasterEgg:
+            algo->elements_part->set_easter_egg(self->v[kParamEasterEgg] > 0);
             break;
 
         // Bus routing and CV input parameters don't need handling (used directly in step())

@@ -30,7 +30,7 @@ patch -R -p5 < ../../../../patches/elements-dynamic-sample-rate.patch
 
 ## elements-dynamic-samples.patch
 
-**Purpose:** Enable dynamic sample loading from SD card instead of compiled-in static arrays
+**Purpose:** Enable dynamic sample loading and runtime LUT generation
 
 **File Modified:** `external/mutable-instruments/elements/resources.h`
 
@@ -39,13 +39,29 @@ patch -R -p5 < ../../../../patches/elements-dynamic-sample-rate.patch
 - Replaces `extern const int16_t smp_noise_sample[]` with pointer `smp_noise_sample_ptr`
 - Replaces `extern const size_t smp_boundaries[]` with pointer `smp_boundaries_ptr`
 - Adds macro redirections so existing code (exciter.cc) works unchanged
-- Removes ~256KB of static sample data from build
+- Changes all 20 LUT declarations from `const float lut_xxx[]` to `const float* lut_xxx`
+- Changes `const int16_t lut_db_led_brightness[]` to `const int16_t* lut_db_led_brightness`
+- Eliminates ~33KB of .rodata (LUT data now generated at runtime by `lut_generator.cpp`)
 
 **Pointer Initialization:**
-The extern pointers are defined in `nt_elements.cpp` and initialized in `construct()` to point to the SampleManager's zero-filled buffers. When samples are loaded from SD card, the pointers are updated in `step()` to point to the loaded data.
+Sample pointers are defined in `nt_elements.cpp` and initialized in `construct()`.
+LUT pointers are defined in `lut_generator.cpp` and initialized in `initialise()` using API-allocated static DRAM.
 
 **Application:**
 Patches are automatically applied during build by the Makefile. This patch is applied after `elements-dynamic-sample-rate.patch`.
+
+## stmlib-runtime-luts.patch
+
+**Purpose:** Change stmlib pitch ratio LUTs from arrays to extern pointers
+
+**Files Modified:** `external/mutable-instruments/stmlib/dsp/units.h`, `external/mutable-instruments/stmlib/dsp/units.cc`
+
+**Changes:**
+- Changes `const float lut_pitch_ratio_high[257]` and `lut_pitch_ratio_low[257]` to `const float*`
+- Removes array data definitions from `units.cc` (generated at runtime by `lut_generator.cpp`)
+
+**Application:**
+Applied from the stmlib subdirectory after the Elements patches.
 
 ---
 
@@ -61,11 +77,15 @@ make apply-patches  # or just 'make' - applied automatically
 cd external/mutable-instruments
 patch -p1 < ../../patches/elements-dynamic-sample-rate.patch
 patch -p1 < ../../patches/elements-dynamic-samples.patch
+cd stmlib
+patch -p1 < ../../../patches/stmlib-runtime-luts.patch
 ```
 
 **Manual Reversal:**
 ```bash
 cd external/mutable-instruments
+git checkout .
+cd stmlib
 git checkout .
 ```
 
