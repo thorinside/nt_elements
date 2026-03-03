@@ -144,11 +144,11 @@ static const uint8_t pageRouting[] = {
 };
 
 static const _NT_parameterPage pages[] = {
-    { .name = "Exciter", .numParams = sizeof(pageExciter), .params = pageExciter },
-    { .name = "Resonator", .numParams = sizeof(pageResonator), .params = pageResonator },
-    { .name = "Space", .numParams = sizeof(pageSpace), .params = pageSpace },
-    { .name = "Performance", .numParams = sizeof(pagePerformance), .params = pagePerformance },
-    { .name = "Routing", .numParams = sizeof(pageRouting), .params = pageRouting },
+    { .name = "Exciter", .numParams = sizeof(pageExciter), .group = 0, .unused = {}, .params = pageExciter },
+    { .name = "Resonator", .numParams = sizeof(pageResonator), .group = 0, .unused = {}, .params = pageResonator },
+    { .name = "Space", .numParams = sizeof(pageSpace), .group = 0, .unused = {}, .params = pageSpace },
+    { .name = "Performance", .numParams = sizeof(pagePerformance), .group = 0, .unused = {}, .params = pagePerformance },
+    { .name = "Routing", .numParams = sizeof(pageRouting), .group = 0, .unused = {}, .params = pageRouting },
 };
 
 static const _NT_parameterPages parameterPages = {
