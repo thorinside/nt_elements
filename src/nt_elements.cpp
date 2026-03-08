@@ -62,6 +62,9 @@ static void setupUi(_NT_algorithm* self, _NT_float3& pots);
 // Easter Egg enum strings
 static const char* const easterEggStrings[] = { "Off", "On", nullptr };
 
+// MIDI Mode enum strings
+static const char* const midiModeStrings[] = { "Off", "Pitch", "Strum", "P&S", "Transpose", nullptr };
+
 // Parameter definitions
 static const _NT_parameter parameters[kNumParams] = {
     // System parameters - Dual external inputs for Elements
@@ -108,6 +111,7 @@ static const _NT_parameter parameters[kNumParams] = {
 
     // Page 5 - Routing (MIDI Chan 0=Off, 1-16=specific channel + CV inputs)
     { .name = "MIDI Chan", .min = 0, .max = 16, .def = 1, .unit = kNT_unitNone, .scaling = 0, .enumStrings = NULL },
+    { .name = "MIDI Mode", .min = 0, .max = 4, .def = 3, .unit = kNT_unitEnum, .scaling = kNT_scalingNone, .enumStrings = midiModeStrings },
     NT_PARAMETER_CV_INPUT("V/Oct CV", 0, 0)
     NT_PARAMETER_CV_INPUT("Gate CV", 0, 0)
     NT_PARAMETER_CV_INPUT("FM CV", 0, 0)
@@ -144,7 +148,7 @@ static const uint8_t pagePerformance[] = {
 static const uint8_t pageRouting[] = {
     kParamBlowInputBus, kParamResoInputBus, kParamOutputBus, kParamOutputMode,
     kParamAuxOutputBus, kParamAuxOutputMode,
-    kParamMidiChannel, kParamVOctCV, kParamGateCV,
+    kParamMidiMode, kParamMidiChannel, kParamVOctCV, kParamGateCV,
     kParamFMCV, kParamBrightnessCV, kParamExpressionCV,
     kParamBowTimbreCV, kParamBlowTimbreCV, kParamStrikeTimbreCV,
     kParamGeometryCV, kParamDampingCV, kParamPositionCV,
@@ -300,6 +304,7 @@ static _NT_algorithm* construct(const _NT_algorithmMemoryPtrs& ptrs, const _NT_a
     self->cv_gate_active = false;
     self->midi_gate_active = false;
     self->midi_pitch = 60.0f;
+    self->midi_transpose = 0.0f;
     self->retrigger_pending = false;
     self->midi_note_on_pending = false;
     self->target_gate = false;
@@ -539,19 +544,46 @@ static void step(_NT_algorithm* self, float* busFrames, int numFramesBy4) {
     }
 
     // Apply pending MIDI updates atomically (thread-safe)
+    const int midi_mode = static_cast<int>(self->v[kParamMidiMode]);
     if (algo->pending_update) {
-        if (algo->midi_note_on_pending && algo->pending_state.gate) {
-            // Fresh note-on: set target pitch/strength, detect retrigger
-            algo->target_pitch = algo->pending_state.note;
-            algo->target_strength = algo->pending_state.strength;
-            if (algo->midi_gate_active || algo->cv_gate_active) {
-                algo->retrigger_pending = true;  // Gate already high, need edge
+        if (midi_mode == kMidiModeOff) {
+            // Off: discard all MIDI updates
+            algo->midi_note_on_pending = false;
+            algo->pending_update = false;
+        } else if (algo->midi_note_on_pending && algo->pending_state.gate) {
+            switch (midi_mode) {
+                case kMidiModePitch:
+                    // Pitch only: set target pitch but NO retrigger
+                    algo->target_pitch = algo->pending_state.note;
+                    break;
+                case kMidiModeStrum:
+                    // Strum only: trigger excitation but do NOT change pitch
+                    algo->target_strength = algo->pending_state.strength;
+                    if (algo->midi_gate_active || algo->cv_gate_active) {
+                        algo->retrigger_pending = true;
+                    }
+                    break;
+                case kMidiModePitchAndStrum:
+                    // Pitch & Strum: current behavior (set pitch + strength + retrigger)
+                    algo->target_pitch = algo->pending_state.note;
+                    algo->target_strength = algo->pending_state.strength;
+                    if (algo->midi_gate_active || algo->cv_gate_active) {
+                        algo->retrigger_pending = true;
+                    }
+                    break;
+                case kMidiModeTranspose:
+                    // Transpose: compute offset from middle C, no retrigger, no pitch change
+                    algo->midi_transpose = algo->pending_state.note - 60.0f;
+                    break;
             }
             algo->midi_note_on_pending = false;
         }
-        algo->midi_gate_active = algo->pending_state.gate;
-        algo->midi_pitch = algo->pending_state.note;
-        algo->perf_state.modulation = algo->pending_state.modulation;
+
+        if (midi_mode != kMidiModeOff) {
+            algo->midi_gate_active = algo->pending_state.gate;
+            algo->midi_pitch = algo->pending_state.note;
+            algo->perf_state.modulation = algo->pending_state.modulation;
+        }
 
         // Memory barrier for ARM - ensure all writes complete before clearing flag
         __asm__ volatile("" ::: "memory");
@@ -588,7 +620,11 @@ static void step(_NT_algorithm* self, float* busFrames, int numFramesBy4) {
             // Rising edge: trigger with V/Oct absolute pitch
             algo->cv_gate_active = true;
             float voct_voltage = voct_cv ? voct_cv[0] : 0.0f;
-            algo->target_pitch = fmaxf(0.0f, fminf(127.0f, (voct_voltage * 12.0f) + 60.0f));
+            float cv_pitch = fmaxf(0.0f, fminf(127.0f, (voct_voltage * 12.0f) + 60.0f));
+            if (midi_mode == kMidiModeTranspose) {
+                cv_pitch = fmaxf(0.0f, fminf(127.0f, cv_pitch + algo->midi_transpose));
+            }
+            algo->target_pitch = cv_pitch;
             algo->target_strength = algo->base_strength;
             if (algo->midi_gate_active || algo->cv_gate_active) {
                 algo->retrigger_pending = true;
@@ -985,6 +1021,11 @@ static void midiMessage(_NT_algorithm* self, uint8_t b0, uint8_t b1, uint8_t b2)
     // Validate algorithm structure integrity
     if (!algo->elements_part) {
         return;  // Plugin being destroyed during reload
+    }
+
+    // Early exit if MIDI mode is Off
+    if (static_cast<int>(self->v[kParamMidiMode]) == kMidiModeOff) {
+        return;
     }
 
     // Parse MIDI message

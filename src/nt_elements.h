@@ -82,6 +82,7 @@ struct nt_elementsAlgorithm : public _NT_algorithm {
     // MIDI gate state
     bool midi_gate_active;   // MIDI gate is currently held
     float midi_pitch;        // Last MIDI note pitch
+    float midi_transpose;    // Transpose offset in semitones (midi_note - 60)
 
     // Trigger/gate resolution
     bool retrigger_pending;      // Force one block of gate=false before resuming

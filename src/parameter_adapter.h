@@ -60,6 +60,7 @@ enum ParameterIndices {
 
     // Routing parameters (MIDI + CV inputs)
     kParamMidiChannel,       // MIDI channel filter (0=Off/disabled, 1-16=specific channel)
+    kParamMidiMode,          // 0=Off, 1=Pitch, 2=Strum, 3=Pitch&Strum, 4=Transpose
     kParamVOctCV,            // V/OCT CV input bus (0=none, 1-28=bus number)
     kParamGateCV,            // Gate CV input bus (0=none, 1-28=bus number)
     kParamFMCV,              // FM Amount CV input bus (0=none, 1-28=bus number)
@@ -76,6 +77,14 @@ enum ParameterIndices {
     kParamEasterEgg,         // Easter egg toggle (0=Off, 1=On)
 
     kNumParams
+};
+
+enum MidiMode {
+    kMidiModeOff = 0,
+    kMidiModePitch = 1,
+    kMidiModeStrum = 2,
+    kMidiModePitchAndStrum = 3,
+    kMidiModeTranspose = 4,
 };
 
 // Parameter conversion helpers
