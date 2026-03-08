@@ -34,7 +34,7 @@ struct nt_elementsAlgorithm : public _NT_algorithm {
 
     // Block size adaptation buffers (VCV uses 4-sample blocks, Elements needs 16)
     // We accumulate input until we have 16 samples, then process through Elements.
-    // Dual input buffers for blow (processed) and strike (direct) paths
+    // Dual input buffers for blow (processed) and reso (direct to resonator) paths
     float blow_input_buffer[kElementsBlockSize];
     float reso_input_buffer[kElementsBlockSize];
     float output_main[kElementsBlockSize];

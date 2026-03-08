@@ -61,7 +61,13 @@ const char* PARAM_NAMES[kNumParams] = {
     "Gate",       // kParamGateCV
     "FM CV",      // kParamFMCV
     "BrightCV",   // kParamBrightnessCV
-    "Expr"        // kParamExpressionCV
+    "Expr",       // kParamExpressionCV
+    "BowTCV",     // kParamBowTimbreCV
+    "BlwTCV",     // kParamBlowTimbreCV
+    "StrTCV",     // kParamStrikeTimbreCV
+    "GeomCV",     // kParamGeometryCV
+    "DampCV",     // kParamDampingCV
+    "PosCV"       // kParamPositionCV
 };
 
 // Page title display timing constants (assuming ~60 FPS draw rate)

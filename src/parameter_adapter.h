@@ -65,6 +65,12 @@ enum ParameterIndices {
     kParamFMCV,              // FM Amount CV input bus (0=none, 1-28=bus number)
     kParamBrightnessCV,      // Resonator Brightness CV input bus (0=none, 1-28=bus number)
     kParamExpressionCV,      // Exciter Expression/Dynamics CV input bus (0=none, 1-28=bus number)
+    kParamBowTimbreCV,       // Bow Timbre CV input bus (0=none, 1-28=bus number)
+    kParamBlowTimbreCV,      // Blow Timbre CV input bus (0=none, 1-28=bus number)
+    kParamStrikeTimbreCV,    // Strike Timbre CV input bus (0=none, 1-28=bus number)
+    kParamGeometryCV,        // Resonator Geometry CV input bus (0=none, 1-28=bus number)
+    kParamDampingCV,         // Resonator Damping CV input bus (0=none, 1-28=bus number)
+    kParamPositionCV,        // Resonator Position CV input bus (0=none, 1-28=bus number)
 
     // Easter egg (OminousVoice FM synthesis mode)
     kParamEasterEgg,         // Easter egg toggle (0=Off, 1=On)

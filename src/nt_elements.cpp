@@ -113,6 +113,12 @@ static const _NT_parameter parameters[kNumParams] = {
     NT_PARAMETER_CV_INPUT("FM CV", 0, 0)
     NT_PARAMETER_CV_INPUT("Bright CV", 0, 0)
     NT_PARAMETER_CV_INPUT("Expr CV", 0, 0)
+    NT_PARAMETER_CV_INPUT("BowTim CV", 0, 0)
+    NT_PARAMETER_CV_INPUT("BlwTim CV", 0, 0)
+    NT_PARAMETER_CV_INPUT("StrTim CV", 0, 0)
+    NT_PARAMETER_CV_INPUT("Geom CV", 0, 0)
+    NT_PARAMETER_CV_INPUT("Damp CV", 0, 0)
+    NT_PARAMETER_CV_INPUT("Pos CV", 0, 0)
 
     // Easter Egg (OminousVoice FM synthesis mode)
     { .name = "Easter Egg", .min = 0, .max = 1, .def = 0, .unit = kNT_unitEnum, .scaling = kNT_scalingNone, .enumStrings = easterEggStrings },
@@ -140,6 +146,8 @@ static const uint8_t pageRouting[] = {
     kParamAuxOutputBus, kParamAuxOutputMode,
     kParamMidiChannel, kParamVOctCV, kParamGateCV,
     kParamFMCV, kParamBrightnessCV, kParamExpressionCV,
+    kParamBowTimbreCV, kParamBlowTimbreCV, kParamStrikeTimbreCV,
+    kParamGeometryCV, kParamDampingCV, kParamPositionCV,
     kParamEasterEgg
 };
 
@@ -476,6 +484,12 @@ static void parameterChanged(_NT_algorithm* self, int p) {
         case kParamFMCV:
         case kParamBrightnessCV:
         case kParamExpressionCV:
+        case kParamBowTimbreCV:
+        case kParamBlowTimbreCV:
+        case kParamStrikeTimbreCV:
+        case kParamGeometryCV:
+        case kParamDampingCV:
+        case kParamPositionCV:
         default:
             break;
     }
@@ -641,6 +655,54 @@ static void step(_NT_algorithm* self, float* busFrames, int numFramesBy4) {
         patch->exciter_bow_level = parameter_adapter::ntToElements(self->v[kParamBowLevel]) * expr_mod;
         patch->exciter_blow_level = parameter_adapter::ntToElements(self->v[kParamBlowLevel]) * expr_mod;
         patch->exciter_strike_level = parameter_adapter::ntToElements(self->v[kParamStrikeLevel]) * expr_mod;
+    }
+
+    // Bow Timbre CV modulation
+    const int bow_timbre_cv_bus = static_cast<int>(self->v[kParamBowTimbreCV]) - 1;
+    if (bow_timbre_cv_bus >= 0 && bow_timbre_cv_bus < 28 && busFrames) {
+        float mod = fmaxf(-1.0f, fminf(1.0f, busFrames[bow_timbre_cv_bus * numFrames] * 0.2f));
+        patch->exciter_bow_timbre = fmaxf(0.0f, fminf(1.0f,
+            parameter_adapter::ntToElements(self->v[kParamBowTimbre]) + mod));
+    }
+
+    // Blow Timbre CV modulation
+    const int blow_timbre_cv_bus = static_cast<int>(self->v[kParamBlowTimbreCV]) - 1;
+    if (blow_timbre_cv_bus >= 0 && blow_timbre_cv_bus < 28 && busFrames) {
+        float mod = fmaxf(-1.0f, fminf(1.0f, busFrames[blow_timbre_cv_bus * numFrames] * 0.2f));
+        patch->exciter_blow_timbre = fmaxf(0.0f, fminf(1.0f,
+            parameter_adapter::ntToElements(self->v[kParamBlowTimbre]) + mod));
+    }
+
+    // Strike Timbre CV modulation
+    const int strike_timbre_cv_bus = static_cast<int>(self->v[kParamStrikeTimbreCV]) - 1;
+    if (strike_timbre_cv_bus >= 0 && strike_timbre_cv_bus < 28 && busFrames) {
+        float mod = fmaxf(-1.0f, fminf(1.0f, busFrames[strike_timbre_cv_bus * numFrames] * 0.2f));
+        patch->exciter_strike_timbre = fmaxf(0.0f, fminf(1.0f,
+            parameter_adapter::ntToElements(self->v[kParamStrikeTimbre]) + mod));
+    }
+
+    // Geometry CV modulation
+    const int geometry_cv_bus = static_cast<int>(self->v[kParamGeometryCV]) - 1;
+    if (geometry_cv_bus >= 0 && geometry_cv_bus < 28 && busFrames) {
+        float mod = fmaxf(-1.0f, fminf(1.0f, busFrames[geometry_cv_bus * numFrames] * 0.2f));
+        patch->resonator_geometry = fmaxf(0.0f, fminf(1.0f,
+            parameter_adapter::ntToElements(self->v[kParamGeometry]) + mod));
+    }
+
+    // Damping CV modulation
+    const int damping_cv_bus = static_cast<int>(self->v[kParamDampingCV]) - 1;
+    if (damping_cv_bus >= 0 && damping_cv_bus < 28 && busFrames) {
+        float mod = fmaxf(-1.0f, fminf(1.0f, busFrames[damping_cv_bus * numFrames] * 0.2f));
+        patch->resonator_damping = fmaxf(0.0f, fminf(1.0f,
+            parameter_adapter::ntToElements(self->v[kParamDamping]) + mod));
+    }
+
+    // Position CV modulation
+    const int position_cv_bus = static_cast<int>(self->v[kParamPositionCV]) - 1;
+    if (position_cv_bus >= 0 && position_cv_bus < 28 && busFrames) {
+        float mod = fmaxf(-1.0f, fminf(1.0f, busFrames[position_cv_bus * numFrames] * 0.2f));
+        patch->resonator_position = fmaxf(0.0f, fminf(1.0f,
+            parameter_adapter::ntToElements(self->v[kParamResonatorPosition]) + mod));
     }
 
 #ifdef NT_EMU_DEBUG
