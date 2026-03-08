@@ -18,6 +18,19 @@
 #define M_PI 3.14159265358979323846
 #endif
 
+// Fast log2 approximation using IEEE 754 bit manipulation.
+// Matches Mutable Instruments' Log2Fast from stages/segment_generator.cc.
+// Only used for LUT generation at init time — accuracy is sufficient.
+static float fast_log2f(float x) {
+    union { float f; int32_t w; } r;
+    r.f = x;
+    float log2 = (float)(((r.w >> 23) & 255) - 128);
+    r.w &= ~(255 << 23);
+    r.w += 127 << 23;
+    log2 += (-0.34484843f * r.f + 2.02466578f) * r.f - 0.67487759f;
+    return log2;
+}
+
 // Original Elements sample rate used for LUT generation
 static const float SAMPLE_RATE = 32000.0f;
 
@@ -48,6 +61,10 @@ const float* lut_midi_to_f_low = nullptr;
 const float* lut_fm_frequency_quantizer = nullptr;
 const float* lut_detune_quantizer = nullptr;
 const float* lut_svf_shift = nullptr;
+
+// Pointer table indexed by LUT_* constants from resources.h
+// Populated by lutGeneratorInit() — indices 0–18 map to individual LUT pointers
+const float* lookup_table_table[19] = {};
 
 } // namespace elements
 
@@ -182,7 +199,7 @@ static void generateDbLedBrightness(int16_t* out) {
         if (i == 0) x = 1.0f / 512.0f;         // x[0] = x[1]
         if (i == 512) x = 511.0f / 512.0f;      // x[-1] = x[-2]
 
-        float brightness = (9.0f + (float)log2(x)) / 9.0f;
+        float brightness = (9.0f + fast_log2f(x)) / 9.0f;
         float val = brightness * 256.0f;
 
         // Clamp to int16 range
@@ -328,7 +345,7 @@ static void generateFmFrequencyQuantizer(float* out) {
     float scale[128];
     int scale_len = 0;
     for (int r = 0; r < 23; ++r) {
-        float semitones = 12.0f * (float)log2(fm_ratios[r]);
+        float semitones = 12.0f * fast_log2f(fm_ratios[r]);
         scale[scale_len++] = semitones;
         scale[scale_len++] = semitones;
         scale[scale_len++] = semitones;
@@ -502,11 +519,6 @@ void lutGeneratorInit(uint8_t* dram) {
     generateSvfShift(svf_shift);
     elements::lut_svf_shift = svf_shift;
 
-    // int16 table
-    int16_t* db_led = allocInt16s(cursor, kDbLedSize);
-    generateDbLedBrightness(db_led);
-    elements::lut_db_led_brightness = db_led;
-
     // stmlib namespace tables
     float* pitch_ratio_high = allocFloats(cursor, kPitchRatioHighSize);
     generatePitchRatioHigh(pitch_ratio_high);
@@ -515,4 +527,30 @@ void lutGeneratorInit(uint8_t* dram) {
     float* pitch_ratio_low = allocFloats(cursor, kPitchRatioLowSize);
     generatePitchRatioLow(pitch_ratio_low);
     stmlib::lut_pitch_ratio_low = pitch_ratio_low;
+
+    // int16 table LAST to avoid misaligning subsequent float allocations
+    int16_t* db_led = allocInt16s(cursor, kDbLedSize);
+    generateDbLedBrightness(db_led);
+    elements::lut_db_led_brightness = db_led;
+
+    // Populate lookup_table_table (indexed by LUT_* constants from resources.h)
+    elements::lookup_table_table[0]  = sine;              // LUT_SINE
+    elements::lookup_table_table[1]  = svf_gain;          // LUT_APPROX_SVF_GAIN
+    elements::lookup_table_table[2]  = svf_g;             // LUT_APPROX_SVF_G
+    elements::lookup_table_table[3]  = svf_r;             // LUT_APPROX_SVF_R
+    elements::lookup_table_table[4]  = svf_h;             // LUT_APPROX_SVF_H
+    elements::lookup_table_table[5]  = four_decades;      // LUT_4_DECADES
+    elements::lookup_table_table[6]  = accent_coarse;     // LUT_ACCENT_GAIN_COARSE
+    elements::lookup_table_table[7]  = accent_fine;       // LUT_ACCENT_GAIN_FINE
+    elements::lookup_table_table[8]  = stiffness;         // LUT_STIFFNESS
+    elements::lookup_table_table[9]  = env_increments;    // LUT_ENV_INCREMENTS
+    elements::lookup_table_table[10] = env_linear;        // LUT_ENV_LINEAR
+    elements::lookup_table_table[11] = env_expo;          // LUT_ENV_EXPO
+    elements::lookup_table_table[12] = env_quartic;       // LUT_ENV_QUARTIC
+    elements::lookup_table_table[13] = midi_to_f_high;    // LUT_MIDI_TO_F_HIGH
+    elements::lookup_table_table[14] = midi_to_inc_high;  // LUT_MIDI_TO_INCREMENT_HIGH
+    elements::lookup_table_table[15] = midi_to_f_low;     // LUT_MIDI_TO_F_LOW
+    elements::lookup_table_table[16] = fm_freq_quant;     // LUT_FM_FREQUENCY_QUANTIZER
+    elements::lookup_table_table[17] = detune_quant;      // LUT_DETUNE_QUANTIZER
+    elements::lookup_table_table[18] = svf_shift;         // LUT_SVF_SHIFT
 }

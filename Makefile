@@ -83,7 +83,7 @@ PATCH_DIR = patches
 PATCH_MARKER = external/mutable-instruments/elements/dsp/.nt_elements_patched
 
 # Targets
-.PHONY: all hardware test clean apply-patches extract-samples
+.PHONY: all hardware test clean apply-patches extract-samples push
 
 all: apply-patches hardware test
 
@@ -157,6 +157,10 @@ $(PLUGINS_DIR):
 
 $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)
+
+# Push to disting NT hardware
+push: hardware
+	ntpush $(PLUGINS_DIR)/$(PROJECT).o
 
 # Clean build artifacts
 clean:
