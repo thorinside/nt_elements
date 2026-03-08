@@ -18,7 +18,7 @@
 enum ParameterIndices {
     // System parameters (routing)
     kParamBlowInputBus = 0,   // External audio input for blow path (diffused → VCA)
-    kParamStrikeInputBus,     // External audio input for strike path (direct to resonator)
+    kParamResoInputBus,       // External audio input sent directly to resonator (unprocessed)
     kParamOutputBus,
     kParamOutputMode,
     kParamAuxOutputBus,

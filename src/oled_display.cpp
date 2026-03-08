@@ -19,7 +19,7 @@ const char* ATTRIBUTION_TEXT = "By Emilie Gillet";
 const char* PARAM_NAMES[kNumParams] = {
     // System parameters (routing)
     "BlowIn",     // kParamBlowInputBus
-    "StrikeIn",   // kParamStrikeInputBus
+    "ResoIn",     // kParamResoInputBus
     "Output",     // kParamOutputBus
     "Mode",       // kParamOutputMode
     "AuxOut",     // kParamAuxOutputBus

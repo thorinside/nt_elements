@@ -28,7 +28,7 @@ struct nt_elementsAlgorithm : public _NT_algorithm {
 
     // Temp buffers for Elements processing (in SRAM)
     float* temp_blow_in;
-    float* temp_strike_in;
+    float* temp_reso_in;
     float* temp_main_out;
     float* temp_aux_out;
 
@@ -36,7 +36,7 @@ struct nt_elementsAlgorithm : public _NT_algorithm {
     // We accumulate input until we have 16 samples, then process through Elements.
     // Dual input buffers for blow (processed) and strike (direct) paths
     float blow_input_buffer[kElementsBlockSize];
-    float strike_input_buffer[kElementsBlockSize];
+    float reso_input_buffer[kElementsBlockSize];
     float output_main[kElementsBlockSize];
     float output_aux[kElementsBlockSize];
     int buffer_pos;  // Current position in buffers (0-15)

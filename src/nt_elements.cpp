@@ -66,9 +66,9 @@ static const char* const easterEggStrings[] = { "Off", "On", nullptr };
 static const _NT_parameter parameters[kNumParams] = {
     // System parameters - Dual external inputs for Elements
     // Blow Input: Audio goes through diffusion → envelope → STRENGTH VCA → resonator
-    // Strike Input: Audio goes directly to resonator (unprocessed)
+    // Reso Input: Audio goes directly to resonator (unprocessed)
     NT_PARAMETER_AUDIO_INPUT("Blow Input", 0, 0)
-    NT_PARAMETER_AUDIO_INPUT("Strike Input", 0, 0)
+    NT_PARAMETER_AUDIO_INPUT("Reso Input", 0, 0)
     NT_PARAMETER_AUDIO_OUTPUT_WITH_MODE("Main Output", 1, 13)
     NT_PARAMETER_AUDIO_OUTPUT_WITH_MODE("Aux Output", 0, 14)
 
@@ -136,7 +136,7 @@ static const uint8_t pagePerformance[] = {
 };
 
 static const uint8_t pageRouting[] = {
-    kParamBlowInputBus, kParamStrikeInputBus, kParamOutputBus, kParamOutputMode,
+    kParamBlowInputBus, kParamResoInputBus, kParamOutputBus, kParamOutputMode,
     kParamAuxOutputBus, kParamAuxOutputMode,
     kParamMidiChannel, kParamVOctCV, kParamGateCV,
     kParamFMCV, kParamBrightnessCV, kParamExpressionCV,
@@ -220,7 +220,7 @@ static _NT_algorithm* construct(const _NT_algorithmMemoryPtrs& ptrs, const _NT_a
 
     self->temp_blow_in = reinterpret_cast<float*>(sram_ptr);
     sram_ptr += 512 * sizeof(float);
-    self->temp_strike_in = reinterpret_cast<float*>(sram_ptr);
+    self->temp_reso_in = reinterpret_cast<float*>(sram_ptr);
     sram_ptr += 512 * sizeof(float);
     self->temp_main_out = reinterpret_cast<float*>(sram_ptr);
     sram_ptr += 512 * sizeof(float);
@@ -228,7 +228,7 @@ static _NT_algorithm* construct(const _NT_algorithmMemoryPtrs& ptrs, const _NT_a
 
     // Zero temp buffers
     memset(self->temp_blow_in, 0, 512 * sizeof(float));
-    memset(self->temp_strike_in, 0, 512 * sizeof(float));
+    memset(self->temp_reso_in, 0, 512 * sizeof(float));
     memset(self->temp_main_out, 0, 512 * sizeof(float));
     memset(self->temp_aux_out, 0, 512 * sizeof(float));
 
@@ -294,7 +294,7 @@ static _NT_algorithm* construct(const _NT_algorithmMemoryPtrs& ptrs, const _NT_a
 
     // Initialize block size adaptation buffers
     memset(self->blow_input_buffer, 0, sizeof(self->blow_input_buffer));
-    memset(self->strike_input_buffer, 0, sizeof(self->strike_input_buffer));
+    memset(self->reso_input_buffer, 0, sizeof(self->reso_input_buffer));
     memset(self->output_main, 0, sizeof(self->output_main));
     memset(self->output_aux, 0, sizeof(self->output_aux));
     self->buffer_pos = 0;
@@ -465,7 +465,7 @@ static void parameterChanged(_NT_algorithm* self, int p) {
 
         // Bus routing and CV input parameters don't need handling (used directly in step())
         case kParamBlowInputBus:
-        case kParamStrikeInputBus:
+        case kParamResoInputBus:
         case kParamOutputBus:
         case kParamOutputMode:
         case kParamAuxOutputBus:
@@ -490,7 +490,7 @@ static void step(_NT_algorithm* self, float* busFrames, int numFramesBy4) {
     nt_elementsAlgorithm* algo = static_cast<nt_elementsAlgorithm*>(self);
 
     // Validate algorithm structure integrity
-    if (!algo->elements_part || !algo->temp_blow_in || !algo->temp_strike_in ||
+    if (!algo->elements_part || !algo->temp_blow_in || !algo->temp_reso_in ||
         !algo->temp_main_out || !algo->temp_aux_out) {
         return;  // Plugin being destroyed during reload
     }
@@ -652,9 +652,9 @@ static void step(_NT_algorithm* self, float* busFrames, int numFramesBy4) {
 #endif
 
     // Get bus assignments (1-based, convert to 0-based for array access)
-    // Dual external inputs: Blow input (processed) and Strike input (direct)
+    // Dual external inputs: Blow input (processed) and Reso input (direct to resonator)
     const int blowInputBus = static_cast<int>(self->v[kParamBlowInputBus]) - 1;
-    const int strikeInputBus = static_cast<int>(self->v[kParamStrikeInputBus]) - 1;
+    const int resoInputBus = static_cast<int>(self->v[kParamResoInputBus]) - 1;
     const int outputBus = static_cast<int>(self->v[kParamOutputBus]) - 1;
     const int outputMode = static_cast<int>(self->v[kParamOutputMode]);
     const int auxOutputBus = static_cast<int>(self->v[kParamAuxOutputBus]) - 1;
@@ -669,8 +669,8 @@ static void step(_NT_algorithm* self, float* busFrames, int numFramesBy4) {
     // Input buses: -1 means not connected (bus 0 in UI), returns nullptr
     const float* blowInput = (busFrames && blowInputBus >= 0 && blowInputBus < 28)
         ? busFrames + (blowInputBus * numFrames) : nullptr;
-    const float* strikeInput = (busFrames && strikeInputBus >= 0 && strikeInputBus < 28)
-        ? busFrames + (strikeInputBus * numFrames) : nullptr;
+    const float* resoInput = (busFrames && resoInputBus >= 0 && resoInputBus < 28)
+        ? busFrames + (resoInputBus * numFrames) : nullptr;
     float* output = (busFrames && outputBus >= 0) ? busFrames + (outputBus * numFrames) : nullptr;
     float* auxOutput = (busFrames && auxOutputBus >= 0) ? busFrames + (auxOutputBus * numFrames) : nullptr;
 
@@ -686,9 +686,9 @@ static void step(_NT_algorithm* self, float* busFrames, int numFramesBy4) {
     for (int i = 0; i < numFrames; ++i) {
         // Store input samples in accumulation buffers
         // Blow input: Goes through diffusion → envelope → STRENGTH VCA → resonator
-        // Strike input: Goes directly to resonator (unprocessed)
+        // Reso input: Goes directly to resonator (unprocessed)
         algo->blow_input_buffer[algo->buffer_pos] = blowInput ? blowInput[i] : 0.0f;
-        algo->strike_input_buffer[algo->buffer_pos] = strikeInput ? strikeInput[i] : 0.0f;
+        algo->reso_input_buffer[algo->buffer_pos] = resoInput ? resoInput[i] : 0.0f;
 
         // Output from buffer (filled in previous processing cycle)
         // Scale by 5.0f for Eurorack standard ±5V levels (Elements outputs normalized -1.0 to +1.0)
@@ -716,13 +716,13 @@ static void step(_NT_algorithm* self, float* busFrames, int numFramesBy4) {
 
             // Copy accumulated inputs to Elements temp buffers
             memcpy(algo->temp_blow_in, algo->blow_input_buffer, kElementsBlockSize * sizeof(float));
-            memcpy(algo->temp_strike_in, algo->strike_input_buffer, kElementsBlockSize * sizeof(float));
+            memcpy(algo->temp_reso_in, algo->reso_input_buffer, kElementsBlockSize * sizeof(float));
 
             // Process full block through Elements DSP
             algo->elements_part->Process(
                 algo->perf_state,
                 algo->temp_blow_in,
-                algo->temp_strike_in,
+                algo->temp_reso_in,
                 algo->output_main,
                 algo->output_aux,
                 static_cast<size_t>(kElementsBlockSize)
