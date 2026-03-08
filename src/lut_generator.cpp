@@ -182,7 +182,7 @@ static void generateDbLedBrightness(int16_t* out) {
         if (i == 0) x = 1.0f / 512.0f;         // x[0] = x[1]
         if (i == 512) x = 511.0f / 512.0f;      // x[-1] = x[-2]
 
-        float brightness = (9.0f + log2f(x)) / 9.0f;
+        float brightness = (9.0f + (float)log2(x)) / 9.0f;
         float val = brightness * 256.0f;
 
         // Clamp to int16 range
@@ -328,7 +328,7 @@ static void generateFmFrequencyQuantizer(float* out) {
     float scale[128];
     int scale_len = 0;
     for (int r = 0; r < 23; ++r) {
-        float semitones = 12.0f * log2f(fm_ratios[r]);
+        float semitones = 12.0f * (float)log2(fm_ratios[r]);
         scale[scale_len++] = semitones;
         scale[scale_len++] = semitones;
         scale[scale_len++] = semitones;
