@@ -289,6 +289,8 @@ static _NT_algorithm* construct(const _NT_algorithmMemoryPtrs& ptrs, const _NT_a
 
     // Initialize CV input state
     self->gate_cv_was_high = false;
+    self->midi_gate = false;
+    self->midi_note = 60.0f;
 
     // Initialize block size adaptation buffers
     memset(self->blow_input_buffer, 0, sizeof(self->blow_input_buffer));
@@ -524,6 +526,10 @@ static void step(_NT_algorithm* self, float* busFrames, int numFramesBy4) {
         algo->perf_state.modulation = algo->pending_state.modulation;
         algo->perf_state.strength = algo->pending_state.strength;
 
+        // Track MIDI gate/note separately for OR logic with CV gate
+        algo->midi_gate = algo->pending_state.gate;
+        algo->midi_note = algo->pending_state.note;
+
         // Memory barrier for ARM - ensure all writes complete before clearing flag
         __asm__ volatile("" ::: "memory");
         algo->pending_update = false;
@@ -551,28 +557,39 @@ static void step(_NT_algorithm* self, float* busFrames, int numFramesBy4) {
         gate_cv = busFrames + (gate_bus * numFrames);
     }
 
-    // Process CV inputs (use first sample of block for control-rate processing)
+    // Process CV inputs - OR logic: MIDI and CV gate work together
     if (gate_cv != nullptr) {
         float gate_voltage = gate_cv[0];
         bool gate_high = gate_voltage > 1.0f;  // Eurorack gate threshold
 
-        if (gate_high) {
-            // Gate is HIGH - CV takes priority over MIDI
-            // Read V/OCT CV (default to 0V = C4 if not connected)
-            float voct_voltage = voct_cv ? voct_cv[0] : 0.0f;
+        // Read V/Oct CV voltage (0V = no offset when used with MIDI, C4 when standalone)
+        float voct_voltage = voct_cv ? voct_cv[0] : 0.0f;
 
-            // Convert V/OCT to MIDI note: 1V/octave, 0V = C4 (MIDI 60)
+        if (gate_high && algo->midi_gate) {
+            // Both active - MIDI note + V/Oct as transposition offset
+            // V/Oct: 0V = no transposition, +1V = +12 semitones, etc.
+            float cv_offset = voct_voltage * 12.0f;
+            float combined_note = algo->midi_note + cv_offset;
+            combined_note = fmaxf(0.0f, fminf(127.0f, combined_note));
+
+            algo->perf_state.note = combined_note;
+            algo->perf_state.gate = true;
+            // Keep MIDI velocity (already in perf_state from pending update)
+        } else if (gate_high) {
+            // CV gate only (no MIDI note held) - V/Oct as absolute pitch
             float cv_note = (voct_voltage * 12.0f) + 60.0f;
-
-            // Clamp to valid MIDI range (0-127)
             cv_note = fmaxf(0.0f, fminf(127.0f, cv_note));
 
-            // Override performance state with CV values
             algo->perf_state.note = cv_note;
             algo->perf_state.gate = true;
-            algo->perf_state.strength = algo->base_strength;  // Use parameter-defined strength for CV input
+            algo->perf_state.strength = algo->base_strength;
+        } else if (algo->midi_gate) {
+            // CV gate LOW but MIDI note held - use MIDI note
+            algo->perf_state.note = algo->midi_note;
+            algo->perf_state.gate = true;
+            // strength already set from MIDI velocity in pending update
         } else {
-            // Gate is LOW - set gate false so strike exciters can retrigger
+            // Both off
             algo->perf_state.gate = false;
         }
 

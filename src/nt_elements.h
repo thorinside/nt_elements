@@ -77,6 +77,10 @@ struct nt_elementsAlgorithm : public _NT_algorithm {
 
     // CV input state
     bool gate_cv_was_high;  // For gate edge detection
+
+    // MIDI gate state (tracked separately for OR logic with CV gate)
+    bool midi_gate;
+    float midi_note;
 };
 
 #endif // NT_ELEMENTS_H_
