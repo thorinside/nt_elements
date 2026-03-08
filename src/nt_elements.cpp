@@ -63,7 +63,7 @@ static void setupUi(_NT_algorithm* self, _NT_float3& pots);
 static const char* const easterEggStrings[] = { "Off", "On", nullptr };
 
 // MIDI Mode enum strings
-static const char* const midiModeStrings[] = { "Off", "Pitch", "Strum", "P&S", "Transpose", nullptr };
+static const char* const midiModeStrings[] = { "Off", "Pitch", "Strum", "Pitch & Strum", "Transpose", nullptr };
 
 // Parameter definitions
 static const _NT_parameter parameters[kNumParams] = {
@@ -556,13 +556,21 @@ static void step(_NT_algorithm* self, float* busFrames, int numFramesBy4) {
                     // Pitch only: set target pitch but NO retrigger
                     algo->target_pitch = algo->pending_state.note;
                     break;
-                case kMidiModeStrum:
-                    // Strum only: trigger excitation but do NOT change pitch
+                case kMidiModeStrum: {
+                    // Strum only: trigger excitation, pitch from CV
                     algo->target_strength = algo->pending_state.strength;
+                    // Read current V/Oct CV for pitch
+                    const int strum_voct_bus = static_cast<int>(self->v[kParamVOctCV]) - 1;
+                    if (strum_voct_bus >= 0 && strum_voct_bus < 28) {
+                        const int nf = numFramesBy4 * 4;
+                        const float* strum_voct = busFrames + (strum_voct_bus * nf);
+                        algo->target_pitch = fmaxf(0.0f, fminf(127.0f, (strum_voct[0] * 12.0f) + 60.0f));
+                    }
                     if (algo->midi_gate_active || algo->cv_gate_active) {
                         algo->retrigger_pending = true;
                     }
                     break;
+                }
                 case kMidiModePitchAndStrum:
                     // Pitch & Strum: current behavior (set pitch + strength + retrigger)
                     algo->target_pitch = algo->pending_state.note;
