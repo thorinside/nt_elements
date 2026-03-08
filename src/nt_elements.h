@@ -76,11 +76,19 @@ struct nt_elementsAlgorithm : public _NT_algorithm {
     float fm_amount;
 
     // CV input state
-    bool gate_cv_was_high;  // For gate edge detection
+    bool cv_gate_was_high;   // For CV gate edge detection
+    bool cv_gate_active;     // CV gate is currently high
 
-    // MIDI gate state (tracked separately for OR logic with CV gate)
-    bool midi_gate;
-    float midi_note;
+    // MIDI gate state
+    bool midi_gate_active;   // MIDI gate is currently held
+    float midi_pitch;        // Last MIDI note pitch
+
+    // Trigger/gate resolution
+    bool retrigger_pending;      // Force one block of gate=false before resuming
+    bool midi_note_on_pending;   // Fresh note-on arrived, needs retrigger check
+    bool target_gate;            // Resolved gate state (either source active)
+    float target_pitch;          // Pitch from last trigger source
+    float target_strength;       // Strength from last trigger source
 };
 
 #endif // NT_ELEMENTS_H_

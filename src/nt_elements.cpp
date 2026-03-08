@@ -295,10 +295,16 @@ static _NT_algorithm* construct(const _NT_algorithmMemoryPtrs& ptrs, const _NT_a
     // Initialize output level (default = 100% = full volume)
     self->output_level_scale = 1.0f;
 
-    // Initialize CV input state
-    self->gate_cv_was_high = false;
-    self->midi_gate = false;
-    self->midi_note = 60.0f;
+    // Initialize CV/MIDI gate and trigger state
+    self->cv_gate_was_high = false;
+    self->cv_gate_active = false;
+    self->midi_gate_active = false;
+    self->midi_pitch = 60.0f;
+    self->retrigger_pending = false;
+    self->midi_note_on_pending = false;
+    self->target_gate = false;
+    self->target_pitch = 60.0f;
+    self->target_strength = 0.5f;
 
     // Initialize block size adaptation buffers
     memset(self->blow_input_buffer, 0, sizeof(self->blow_input_buffer));
@@ -534,15 +540,18 @@ static void step(_NT_algorithm* self, float* busFrames, int numFramesBy4) {
 
     // Apply pending MIDI updates atomically (thread-safe)
     if (algo->pending_update) {
-        // Copy fields individually to ensure proper memory ordering on ARM
-        algo->perf_state.gate = algo->pending_state.gate;
-        algo->perf_state.note = algo->pending_state.note;
+        if (algo->midi_note_on_pending && algo->pending_state.gate) {
+            // Fresh note-on: set target pitch/strength, detect retrigger
+            algo->target_pitch = algo->pending_state.note;
+            algo->target_strength = algo->pending_state.strength;
+            if (algo->midi_gate_active || algo->cv_gate_active) {
+                algo->retrigger_pending = true;  // Gate already high, need edge
+            }
+            algo->midi_note_on_pending = false;
+        }
+        algo->midi_gate_active = algo->pending_state.gate;
+        algo->midi_pitch = algo->pending_state.note;
         algo->perf_state.modulation = algo->pending_state.modulation;
-        algo->perf_state.strength = algo->pending_state.strength;
-
-        // Track MIDI gate/note separately for OR logic with CV gate
-        algo->midi_gate = algo->pending_state.gate;
-        algo->midi_note = algo->pending_state.note;
 
         // Memory barrier for ARM - ensure all writes complete before clearing flag
         __asm__ volatile("" ::: "memory");
@@ -571,43 +580,35 @@ static void step(_NT_algorithm* self, float* busFrames, int numFramesBy4) {
         gate_cv = busFrames + (gate_bus * numFrames);
     }
 
-    // Process CV inputs - OR logic: MIDI and CV gate work together
+    // Process CV inputs - independent edge detection, "last trigger wins" pitch
     if (gate_cv != nullptr) {
-        float gate_voltage = gate_cv[0];
-        bool gate_high = gate_voltage > 1.0f;  // Eurorack gate threshold
+        bool gate_high = gate_cv[0] > 1.0f;  // Eurorack gate threshold
 
-        // Read V/Oct CV voltage (0V = no offset when used with MIDI, C4 when standalone)
-        float voct_voltage = voct_cv ? voct_cv[0] : 0.0f;
-
-        if (gate_high && algo->midi_gate) {
-            // Both active - MIDI note + V/Oct as transposition offset
-            // V/Oct: 0V = no transposition, +1V = +12 semitones, etc.
-            float cv_offset = voct_voltage * 12.0f;
-            float combined_note = algo->midi_note + cv_offset;
-            combined_note = fmaxf(0.0f, fminf(127.0f, combined_note));
-
-            algo->perf_state.note = combined_note;
-            algo->perf_state.gate = true;
-            // Keep MIDI velocity (already in perf_state from pending update)
-        } else if (gate_high) {
-            // CV gate only (no MIDI note held) - V/Oct as absolute pitch
-            float cv_note = (voct_voltage * 12.0f) + 60.0f;
-            cv_note = fmaxf(0.0f, fminf(127.0f, cv_note));
-
-            algo->perf_state.note = cv_note;
-            algo->perf_state.gate = true;
-            algo->perf_state.strength = algo->base_strength;
-        } else if (algo->midi_gate) {
-            // CV gate LOW but MIDI note held - use MIDI note
-            algo->perf_state.note = algo->midi_note;
-            algo->perf_state.gate = true;
-            // strength already set from MIDI velocity in pending update
-        } else {
-            // Both off
-            algo->perf_state.gate = false;
+        if (gate_high && !algo->cv_gate_was_high) {
+            // Rising edge: trigger with V/Oct absolute pitch
+            algo->cv_gate_active = true;
+            float voct_voltage = voct_cv ? voct_cv[0] : 0.0f;
+            algo->target_pitch = fmaxf(0.0f, fminf(127.0f, (voct_voltage * 12.0f) + 60.0f));
+            algo->target_strength = algo->base_strength;
+            if (algo->midi_gate_active || algo->cv_gate_active) {
+                algo->retrigger_pending = true;
+            }
+        } else if (!gate_high && algo->cv_gate_was_high) {
+            algo->cv_gate_active = false;
         }
+        algo->cv_gate_was_high = gate_high;
+    }
 
-        algo->gate_cv_was_high = gate_high;
+    // Resolve target gate from both sources
+    algo->target_gate = algo->midi_gate_active || algo->cv_gate_active;
+
+    // Apply gate/pitch if no retrigger pending (retrigger handled at block boundary)
+    if (!algo->retrigger_pending) {
+        algo->perf_state.gate = algo->target_gate;
+        if (algo->target_gate) {
+            algo->perf_state.note = algo->target_pitch;
+            algo->perf_state.strength = algo->target_strength;
+        }
     }
 
     // Apply tuning offset to MIDI note
@@ -775,6 +776,16 @@ static void step(_NT_algorithm* self, float* busFrames, int numFramesBy4) {
         // When we've accumulated 16 samples, process through Elements
         if (algo->buffer_pos >= kElementsBlockSize) {
             algo->buffer_pos = 0;
+
+            // Retrigger: force gate=false for one block to create rising edge
+            if (algo->retrigger_pending) {
+                algo->perf_state.gate = false;
+                algo->retrigger_pending = false;
+            } else {
+                algo->perf_state.gate = algo->target_gate;
+                algo->perf_state.note = algo->target_pitch;
+                algo->perf_state.strength = algo->target_strength;
+            }
 
             // Copy accumulated inputs to Elements temp buffers
             memcpy(algo->temp_blow_in, algo->blow_input_buffer, kElementsBlockSize * sizeof(float));
@@ -1014,6 +1025,7 @@ static void midiMessage(_NT_algorithm* self, uint8_t b0, uint8_t b1, uint8_t b2)
             algo->pending_state.strength = static_cast<float>(data2) / 127.0f;
 
             // Mark update ready
+            algo->midi_note_on_pending = true;
             algo->pending_update = true;
 
 #ifdef NT_EMU_DEBUG
