@@ -1,0 +1,15 @@
+diff --git a/elements/dsp/exciter.cc b/elements/dsp/exciter.cc
+index 1234567..abcdefg 100644
+--- a/elements/dsp/exciter.cc
++++ b/elements/dsp/exciter.cc
+@@ -255,7 +255,9 @@ void Exciter::ProcessFlow(
+     const uint8_t flags,
+     float* out,
+     size_t size) {
+-  float scale = parameter_ * parameter_ * parameter_ * parameter_;
++  // nt_elements: Break up x*x*x*x to prevent -Os from emitting __powisf2
++  float p2 = parameter_ * parameter_;
++  float scale = p2 * p2;
+   float threshold = 0.0001f + scale * 0.125f;
+   if (flags & EXCITER_FLAG_RISING_EDGE) {
+     particle_state_ = 0.5f;

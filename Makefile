@@ -24,14 +24,12 @@ SOURCES = \
 	src/lut_generator.cpp \
 	external/mutable-instruments/elements/dsp/exciter.cc \
 	external/mutable-instruments/elements/dsp/multistage_envelope.cc \
-	external/mutable-instruments/elements/dsp/ominous_voice.cc \
 	external/mutable-instruments/elements/dsp/part.cc \
 	external/mutable-instruments/elements/dsp/resonator.cc \
 	external/mutable-instruments/elements/dsp/string.cc \
 	external/mutable-instruments/elements/dsp/tube.cc \
 	external/mutable-instruments/elements/dsp/voice.cc \
-	external/mutable-instruments/stmlib/utils/random.cc \
-	external/mutable-instruments/stmlib/dsp/units.cc
+	external/mutable-instruments/stmlib/utils/random.cc
 
 # LUTs generated at runtime in DRAM (saves ~33KB .rodata, keeps .text+.rodata under 64KB)
 # Wavetable sample data loaded dynamically from SD card
@@ -54,7 +52,7 @@ CXXFLAGS_ARM = $(CXXFLAGS_COMMON) $(DEFINES_HARDWARE) \
 	-mcpu=cortex-m7 \
 	-mfpu=fpv5-d16 \
 	-mfloat-abi=hard \
-	-O3 \
+	-Os \
 	-ffast-math \
 	-funroll-loops \
 	-fdata-sections \
@@ -95,6 +93,8 @@ apply-patches:
 		cd external/mutable-instruments && \
 		patch -p1 < ../../$(PATCH_DIR)/elements-dynamic-sample-rate.patch && \
 		patch -p1 < ../../$(PATCH_DIR)/elements-dynamic-samples.patch && \
+		patch -p1 < ../../$(PATCH_DIR)/elements-no-powisf2.patch && \
+		patch -p1 < ../../$(PATCH_DIR)/elements-remove-easter-egg.patch && \
 		cd stmlib && \
 		patch -p1 < ../../../$(PATCH_DIR)/stmlib-runtime-luts.patch && \
 		cd .. && \

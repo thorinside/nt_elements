@@ -60,7 +60,6 @@ static void customUi(_NT_algorithm* self, const _NT_uiData& data);
 static void setupUi(_NT_algorithm* self, _NT_float3& pots);
 
 // Easter Egg enum strings
-static const char* const easterEggStrings[] = { "Off", "On", nullptr };
 
 // MIDI Mode enum strings
 static const char* const midiModeStrings[] = { "Off", "Pitch", "Strum", "Pitch & Strum", "Transpose", nullptr };
@@ -124,8 +123,6 @@ static const _NT_parameter parameters[kNumParams] = {
     NT_PARAMETER_CV_INPUT("Damp CV", 0, 0)
     NT_PARAMETER_CV_INPUT("Pos CV", 0, 0)
 
-    // Easter Egg (OminousVoice FM synthesis mode)
-    { .name = "Easter Egg", .min = 0, .max = 1, .def = 0, .unit = kNT_unitEnum, .scaling = kNT_scalingNone, .enumStrings = easterEggStrings },
 };
 
 // Parameter pages for menu organization
@@ -151,8 +148,7 @@ static const uint8_t pageRouting[] = {
     kParamMidiMode, kParamMidiChannel, kParamVOctCV, kParamGateCV,
     kParamFMCV, kParamBrightnessCV, kParamExpressionCV,
     kParamBowTimbreCV, kParamBlowTimbreCV, kParamStrikeTimbreCV,
-    kParamGeometryCV, kParamDampingCV, kParamPositionCV,
-    kParamEasterEgg
+    kParamGeometryCV, kParamDampingCV, kParamPositionCV
 };
 
 static const _NT_parameterPage pages[] = {
@@ -476,10 +472,6 @@ static void parameterChanged(_NT_algorithm* self, int p) {
 
         case kParamStrength:
             algo->base_strength = parameter_adapter::ntToElements(self->v[kParamStrength]);
-            break;
-
-        case kParamEasterEgg:
-            algo->elements_part->set_easter_egg(self->v[kParamEasterEgg] > 0);
             break;
 
         // Bus routing and CV input parameters don't need handling (used directly in step())

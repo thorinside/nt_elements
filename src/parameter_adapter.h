@@ -73,9 +73,6 @@ enum ParameterIndices {
     kParamDampingCV,         // Resonator Damping CV input bus (0=none, 1-28=bus number)
     kParamPositionCV,        // Resonator Position CV input bus (0=none, 1-28=bus number)
 
-    // Easter egg (OminousVoice FM synthesis mode)
-    kParamEasterEgg,         // Easter egg toggle (0=Off, 1=On)
-
     kNumParams
 };
 
