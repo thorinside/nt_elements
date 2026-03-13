@@ -122,6 +122,7 @@ static const _NT_parameter parameters[kNumParams] = {
     NT_PARAMETER_CV_INPUT("Geom CV", 0, 0)
     NT_PARAMETER_CV_INPUT("Damp CV", 0, 0)
     NT_PARAMETER_CV_INPUT("Pos CV", 0, 0)
+    NT_PARAMETER_CV_INPUT("Str CV", 0, 0)
 
 };
 
@@ -148,7 +149,7 @@ static const uint8_t pageRouting[] = {
     kParamMidiMode, kParamMidiChannel, kParamVOctCV, kParamGateCV,
     kParamFMCV, kParamBrightnessCV, kParamExpressionCV,
     kParamBowTimbreCV, kParamBlowTimbreCV, kParamStrikeTimbreCV,
-    kParamGeometryCV, kParamDampingCV, kParamPositionCV
+    kParamGeometryCV, kParamDampingCV, kParamPositionCV, kParamStrengthCV
 };
 
 static const _NT_parameterPage pages[] = {
@@ -306,6 +307,7 @@ static _NT_algorithm* construct(const _NT_algorithmMemoryPtrs& ptrs, const _NT_a
     self->target_gate = false;
     self->target_pitch = 60.0f;
     self->target_strength = 0.5f;
+    self->cv_is_pitch_source = false;
 
     // Initialize block size adaptation buffers
     memset(self->blow_input_buffer, 0, sizeof(self->blow_input_buffer));
@@ -493,6 +495,7 @@ static void parameterChanged(_NT_algorithm* self, int p) {
         case kParamGeometryCV:
         case kParamDampingCV:
         case kParamPositionCV:
+        case kParamStrengthCV:
         default:
             break;
     }
@@ -547,6 +550,7 @@ static void step(_NT_algorithm* self, float* busFrames, int numFramesBy4) {
                 case kMidiModePitch:
                     // Pitch only: set target pitch but NO retrigger
                     algo->target_pitch = algo->pending_state.note;
+                    algo->cv_is_pitch_source = false;
                     break;
                 case kMidiModeStrum: {
                     // Strum only: trigger excitation, pitch from CV
@@ -567,6 +571,7 @@ static void step(_NT_algorithm* self, float* busFrames, int numFramesBy4) {
                     // Pitch & Strum: current behavior (set pitch + strength + retrigger)
                     algo->target_pitch = algo->pending_state.note;
                     algo->target_strength = algo->pending_state.strength;
+                    algo->cv_is_pitch_source = false;
                     if (algo->midi_gate_active || algo->cv_gate_active) {
                         algo->retrigger_pending = true;
                     }
@@ -617,15 +622,9 @@ static void step(_NT_algorithm* self, float* busFrames, int numFramesBy4) {
         bool gate_high = gate_cv[0] > 1.0f;  // Eurorack gate threshold
 
         if (gate_high && !algo->cv_gate_was_high) {
-            // Rising edge: trigger with V/Oct absolute pitch
+            // Rising edge: trigger gate and retrigger, pitch tracked continuously below
             algo->cv_gate_active = true;
-            float voct_voltage = voct_cv ? voct_cv[0] : 0.0f;
-            float cv_pitch = fmaxf(0.0f, fminf(127.0f, (voct_voltage * 12.0f) + 60.0f));
-            if (midi_mode == kMidiModeTranspose) {
-                cv_pitch = fmaxf(0.0f, fminf(127.0f, cv_pitch + algo->midi_transpose));
-            }
-            algo->target_pitch = cv_pitch;
-            algo->target_strength = algo->base_strength;
+            algo->cv_is_pitch_source = true;
             if (algo->midi_gate_active || algo->cv_gate_active) {
                 algo->retrigger_pending = true;
             }
@@ -633,6 +632,24 @@ static void step(_NT_algorithm* self, float* busFrames, int numFramesBy4) {
             algo->cv_gate_active = false;
         }
         algo->cv_gate_was_high = gate_high;
+    }
+
+    // Continuously track V/Oct CV when CV is the pitch source
+    // This matches original Elements behavior (Part::Process sets note on every block)
+    // and fixes "one note behind" with hardware sequencers where CV settles after gate
+    if (voct_cv != nullptr && algo->cv_is_pitch_source) {
+        float voct_voltage = voct_cv[0];
+        float cv_pitch = fmaxf(0.0f, fminf(127.0f, (voct_voltage * 12.0f) + 60.0f));
+        if (midi_mode == kMidiModeTranspose) {
+            cv_pitch = fmaxf(0.0f, fminf(127.0f, cv_pitch + algo->midi_transpose));
+        }
+        algo->target_pitch = cv_pitch;
+    }
+
+    // Continuously update strength from knob when CV is the source (or no MIDI active)
+    // This ensures turning the Strength knob mid-note has immediate effect
+    if (algo->cv_is_pitch_source || !algo->midi_gate_active) {
+        algo->target_strength = algo->base_strength;
     }
 
     // Resolve target gate from both sources
@@ -740,6 +757,13 @@ static void step(_NT_algorithm* self, float* busFrames, int numFramesBy4) {
         float mod = fmaxf(-1.0f, fminf(1.0f, busFrames[position_cv_bus * numFrames] * 0.2f));
         patch->resonator_position = fmaxf(0.0f, fminf(1.0f,
             parameter_adapter::ntToElements(self->v[kParamResonatorPosition]) + mod));
+    }
+
+    // Strength CV modulation (bipolar: -5V to +5V modulates base_strength)
+    const int strength_cv_bus = static_cast<int>(self->v[kParamStrengthCV]) - 1;
+    if (strength_cv_bus >= 0 && strength_cv_bus < 28 && busFrames) {
+        float mod = fmaxf(-1.0f, fminf(1.0f, busFrames[strength_cv_bus * numFrames] * 0.2f));
+        algo->target_strength = fmaxf(0.0f, fminf(1.0f, algo->target_strength + mod));
     }
 
 #ifdef NT_EMU_DEBUG

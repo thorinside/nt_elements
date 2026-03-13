@@ -72,6 +72,7 @@ enum ParameterIndices {
     kParamGeometryCV,        // Resonator Geometry CV input bus (0=none, 1-28=bus number)
     kParamDampingCV,         // Resonator Damping CV input bus (0=none, 1-28=bus number)
     kParamPositionCV,        // Resonator Position CV input bus (0=none, 1-28=bus number)
+    kParamStrengthCV,        // Excitation Strength CV input bus (0=none, 1-28=bus number)
 
     kNumParams
 };

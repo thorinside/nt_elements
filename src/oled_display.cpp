@@ -47,6 +47,10 @@ const char* PARAM_NAMES[kNumParams] = {
     "Size",       // kParamReverbSize
     "RvDamp",     // kParamReverbDamping
 
+    // Additional synthesis parameters
+    "Signatr",    // kParamSignature
+    "SterMod",    // kParamStereoMod
+
     // Performance/Tuning parameters
     "Coarse",     // kParamCoarseTune
     "Fine",       // kParamFineTune
@@ -57,6 +61,7 @@ const char* PARAM_NAMES[kNumParams] = {
 
     // Routing parameters (MIDI + CV)
     "MIDI Ch",    // kParamMidiChannel
+    "MIDI Md",    // kParamMidiMode
     "V/Oct",      // kParamVOctCV
     "Gate",       // kParamGateCV
     "FM CV",      // kParamFMCV
@@ -67,7 +72,8 @@ const char* PARAM_NAMES[kNumParams] = {
     "StrTCV",     // kParamStrikeTimbreCV
     "GeomCV",     // kParamGeometryCV
     "DampCV",     // kParamDampingCV
-    "PosCV"       // kParamPositionCV
+    "PosCV",      // kParamPositionCV
+    "StrCV"       // kParamStrengthCV
 };
 
 // Page title display timing constants (assuming ~60 FPS draw rate)

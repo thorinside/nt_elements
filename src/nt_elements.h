@@ -90,6 +90,9 @@ struct nt_elementsAlgorithm : public _NT_algorithm {
     bool target_gate;            // Resolved gate state (either source active)
     float target_pitch;          // Pitch from last trigger source
     float target_strength;       // Strength from last trigger source
+
+    // Pitch source tracking (for continuous V/Oct vs MIDI)
+    bool cv_is_pitch_source;     // true when CV gate triggered, false when MIDI note-on triggered
 };
 
 #endif // NT_ELEMENTS_H_
