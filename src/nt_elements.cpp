@@ -369,78 +369,78 @@ static void parameterChanged(_NT_algorithm* self, int p) {
     switch (p) {
         // Page 1 - Exciter parameters
         case kParamBowLevel:
-            patch->exciter_bow_level = parameter_adapter::ntToElements(self->v[kParamBowLevel]);
+            patch->exciter_bow_level = parameter_adapter::clampElementsValue(parameter_adapter::ntToElements(self->v[kParamBowLevel]));
             break;
 
         case kParamBlowLevel:
-            patch->exciter_blow_level = parameter_adapter::ntToElements(self->v[kParamBlowLevel]);
+            patch->exciter_blow_level = parameter_adapter::clampElementsValue(parameter_adapter::ntToElements(self->v[kParamBlowLevel]));
             break;
 
         case kParamStrikeLevel:
-            patch->exciter_strike_level = parameter_adapter::ntToElements(self->v[kParamStrikeLevel]);
+            patch->exciter_strike_level = parameter_adapter::clampElementsValue(parameter_adapter::ntToElements(self->v[kParamStrikeLevel]));
             break;
 
         case kParamBowTimbre:
-            patch->exciter_bow_timbre = parameter_adapter::ntToElements(self->v[kParamBowTimbre]);
+            patch->exciter_bow_timbre = parameter_adapter::clampElementsValue(parameter_adapter::ntToElements(self->v[kParamBowTimbre]));
             break;
 
         case kParamBlowTimbre:
-            patch->exciter_blow_timbre = parameter_adapter::ntToElements(self->v[kParamBlowTimbre]);
+            patch->exciter_blow_timbre = parameter_adapter::clampElementsValue(parameter_adapter::ntToElements(self->v[kParamBlowTimbre]));
             break;
 
         case kParamStrikeTimbre:
-            patch->exciter_strike_timbre = parameter_adapter::ntToElements(self->v[kParamStrikeTimbre]);
+            patch->exciter_strike_timbre = parameter_adapter::clampElementsValue(parameter_adapter::ntToElements(self->v[kParamStrikeTimbre]));
             break;
 
         case kParamBlowFlow:
-            patch->exciter_blow_meta = parameter_adapter::ntToElements(self->v[kParamBlowFlow]);
+            patch->exciter_blow_meta = parameter_adapter::clampElementsValue(parameter_adapter::ntToElements(self->v[kParamBlowFlow]));
             break;
 
         case kParamStrikeMallet:
-            patch->exciter_strike_meta = parameter_adapter::ntToElements(self->v[kParamStrikeMallet]);
+            patch->exciter_strike_meta = parameter_adapter::clampElementsValue(parameter_adapter::ntToElements(self->v[kParamStrikeMallet]));
             break;
 
         // Page 2 - Resonator parameters
         case kParamGeometry:
-            patch->resonator_geometry = parameter_adapter::ntToElements(self->v[kParamGeometry]);
+            patch->resonator_geometry = parameter_adapter::clampElementsValue(parameter_adapter::ntToElements(self->v[kParamGeometry]));
             break;
 
         case kParamBrightness:
-            patch->resonator_brightness = parameter_adapter::ntToElements(self->v[kParamBrightness]);
+            patch->resonator_brightness = parameter_adapter::clampElementsValue(parameter_adapter::ntToElements(self->v[kParamBrightness]));
             break;
 
         case kParamDamping:
-            patch->resonator_damping = parameter_adapter::ntToElements(self->v[kParamDamping]);
+            patch->resonator_damping = parameter_adapter::clampElementsValue(parameter_adapter::ntToElements(self->v[kParamDamping]));
             break;
 
         case kParamResonatorPosition:
-            patch->resonator_position = parameter_adapter::ntToElements(self->v[kParamResonatorPosition]);
+            patch->resonator_position = parameter_adapter::clampElementsValue(parameter_adapter::ntToElements(self->v[kParamResonatorPosition]));
             break;
 
         case kParamInharmonicity:
-            patch->resonator_modulation_frequency = parameter_adapter::ntToElements(self->v[kParamInharmonicity]);
+            patch->resonator_modulation_frequency = parameter_adapter::clampElementsValue(parameter_adapter::ntToElements(self->v[kParamInharmonicity]));
             break;
 
         // Page 3 - Space (Reverb) parameters
         case kParamReverbAmount:
-            patch->space = parameter_adapter::ntToElements(self->v[kParamReverbAmount]);
+            patch->space = parameter_adapter::clampElementsValue(parameter_adapter::ntToElements(self->v[kParamReverbAmount]));
             break;
 
         case kParamReverbSize:
-            patch->reverb_lp = parameter_adapter::ntToElements(self->v[kParamReverbSize]);
+            patch->reverb_lp = parameter_adapter::clampElementsValue(parameter_adapter::ntToElements(self->v[kParamReverbSize]));
             break;
 
         case kParamReverbDamping:
-            patch->reverb_diffusion = parameter_adapter::ntToElements(self->v[kParamReverbDamping]);
+            patch->reverb_diffusion = parameter_adapter::clampElementsValue(parameter_adapter::ntToElements(self->v[kParamReverbDamping]));
             break;
 
         // Additional synthesis parameters
         case kParamSignature:
-            patch->exciter_signature = parameter_adapter::ntToElements(self->v[kParamSignature]);
+            patch->exciter_signature = parameter_adapter::clampElementsValue(parameter_adapter::ntToElements(self->v[kParamSignature]));
             break;
 
         case kParamStereoMod:
-            patch->resonator_modulation_offset = parameter_adapter::ntToElements(self->v[kParamStereoMod]) * 0.15f;  // Scale to 0-0.15 range
+            patch->resonator_modulation_offset = parameter_adapter::clampElementsValue(parameter_adapter::ntToElements(self->v[kParamStereoMod])) * 0.15f;  // Scale to 0-0.15 range
             break;
 
         // Page 4 - Performance parameters
@@ -469,11 +469,11 @@ static void parameterChanged(_NT_algorithm* self, int p) {
             break;
 
         case kParamExciterContour:
-            patch->exciter_envelope_shape = parameter_adapter::ntToElements(self->v[kParamExciterContour]);
+            patch->exciter_envelope_shape = parameter_adapter::clampElementsValue(parameter_adapter::ntToElements(self->v[kParamExciterContour]));
             break;
 
         case kParamStrength:
-            algo->base_strength = parameter_adapter::ntToElements(self->v[kParamStrength]);
+            algo->base_strength = parameter_adapter::clampElementsValue(parameter_adapter::ntToElements(self->v[kParamStrength]));
             break;
 
         // Bus routing and CV input parameters don't need handling (used directly in step())
@@ -706,9 +706,9 @@ static void step(_NT_algorithm* self, float* busFrames, int numFramesBy4) {
         float expr_mod = fmaxf(0.0f, fminf(1.0f, expression_cv[0] * 0.1f));
 
         // Apply expression to active exciter levels
-        patch->exciter_bow_level = parameter_adapter::ntToElements(self->v[kParamBowLevel]) * expr_mod;
-        patch->exciter_blow_level = parameter_adapter::ntToElements(self->v[kParamBlowLevel]) * expr_mod;
-        patch->exciter_strike_level = parameter_adapter::ntToElements(self->v[kParamStrikeLevel]) * expr_mod;
+        patch->exciter_bow_level = parameter_adapter::clampElementsValue(parameter_adapter::ntToElements(self->v[kParamBowLevel]) * expr_mod);
+        patch->exciter_blow_level = parameter_adapter::clampElementsValue(parameter_adapter::ntToElements(self->v[kParamBlowLevel]) * expr_mod);
+        patch->exciter_strike_level = parameter_adapter::clampElementsValue(parameter_adapter::ntToElements(self->v[kParamStrikeLevel]) * expr_mod);
     }
 
     // Bow Timbre CV modulation
